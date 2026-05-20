@@ -374,7 +374,7 @@ projekte.forEach((proj, idx) => {
           text: "  " + (CI.phase[ph]?.label || ph),
           options:{ color:CI.text, fontSize:rFontSize, align:"left" }
         }];
-        MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.white} }}));
+        MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.bgLight} }}));
         ganttRows.push(row);
         pillRowMap.set(`${tpIdx}-${ph}`, ganttRows.length - 1);
       });
@@ -385,7 +385,7 @@ projekte.forEach((proj, idx) => {
       rowH: rH,
       border: { pt: 0.3, color: "D0D8E4" },
       fontFace: "Calibri", color: CI.text,
-      fill: { color: CI.white }
+      fill: { color: CI.bgLight }
     });
 
     const pillPadX = 0.02;
@@ -462,10 +462,11 @@ projekte.forEach((proj, idx) => {
 
     // === Folie B: Kapazitätsplanung (FTE) ===
     const slideB = pres.addSlide();
-    addFrameLight(pres, slideB, proj.name || `Projekt ${idx+1}`, pageCounter++);
+    const titleB = (proj.name || `Projekt ${idx+1}`) + " – Kapazitätsplanung";
+    addFrameLight(pres, slideB, titleB, pageCounter++);
     const availH_fte = L.footerY - ganttY - 0.06;
-    const rowH_B     = Math.min(0.45, Math.max(0.18, availH_fte / fteNRows));
-    const fontSize_B = rowH_B >= 0.22 ? 8 : 7;
+    const rowH_B     = Math.min(0.70, Math.max(0.25, availH_fte / fteNRows));
+    const fontSize_B = rowH_B >= 0.45 ? 10 : rowH_B >= 0.22 ? 8 : 7;
     renderFte(slideB, rowH_B, fontSize_B, ganttY + labelGap);
 
   } else {
