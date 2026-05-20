@@ -372,9 +372,9 @@ projekte.forEach((proj, idx) => {
       tpPhaseRows[tpIdx].forEach(ph => {
         const row = [{
           text: "  " + (CI.phase[ph]?.label || ph),
-          options:{ color:CI.text, fontSize:rFontSize, align:"left" }
+          options:{ fill:{color:CI.white}, color:CI.text, fontSize:rFontSize, align:"left" }
         }];
-        MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.bgLight} }}));
+        MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.white} }}));
         ganttRows.push(row);
         pillRowMap.set(`${tpIdx}-${ph}`, ganttRows.length - 1);
       });
@@ -385,7 +385,7 @@ projekte.forEach((proj, idx) => {
       rowH: rH,
       border: { pt: 0.3, color: "D0D8E4" },
       fontFace: "Calibri", color: CI.text,
-      fill: { color: CI.bgLight }
+      fill: { color: CI.white }
     });
 
     const pillPadX = 0.02;
@@ -455,7 +455,7 @@ projekte.forEach((proj, idx) => {
     // === Folie A: Gantt-Diagramm ===
     const slideA = pres.addSlide();
     addFrameLight(pres, slideA, proj.name || `Projekt ${idx+1}`, pageCounter++);
-    const availH_gantt = L.footerY - ganttY - 0.06;
+    const availH_gantt = L.footerY - ganttY - 0.18;
     const rowH_A       = Math.min(0.45, Math.max(0.18, availH_gantt / ganttNRows));
     const fontSize_A   = rowH_A >= 0.22 ? 8 : 7;
     renderGantt(slideA, rowH_A, fontSize_A, ganttY);
