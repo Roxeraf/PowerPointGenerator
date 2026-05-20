@@ -1,0 +1,719 @@
+' =========================================================================
+' PURELOX KAPAZITAETSPLANER v3
+' BOOST - Customer Solutions Team
+'
+' WORKFLOW:
+'   1. Makro "Erstelle_Komplettes_Planungs_Tool" ausfuehren
+'   2. Blatt "Konfiguration" ausfuellen (Titelseite, Pfade)
+'   3. Projektblaetter mit Gantt-Kuerzeln und FTE-Werten befuellen
+'   4. Button "PowerPoint exportieren" klicken
+'
+' GANTT-KUERZEL: p=Pflichtenheft  k=Konfiguration  t=Test  g=GoLive  ?=Meilenstein
+' =========================================================================
+
+Option Explicit
+
+' =========================================================================
+' 1. HAUPT-EINSTIEGSPUNKT
+' =========================================================================
+Sub Erstelle_Komplettes_Planungs_Tool()
+    Dim wb As Workbook
+    Set wb = ActiveWorkbook
+
+    Call Erstelle_Konfigurationsblatt(wb)
+    Call Erstelle_Planungsblaetter(wb)
+
+    wb.Worksheets("Konfiguration").Activate
+    MsgBox "Planungs-Tool erstellt!" & vbNewLine & vbNewLine & _
+           "Naechste Schritte:" & vbNewLine & _
+           "1. Blatt 'Konfiguration' ausfuellen" & vbNewLine & _
+           "2. Projektblaetter mit p/k/t/g/? und FTE-Werten befuellen" & vbNewLine & _
+           "3. 'PowerPoint exportieren' klicken", _
+           vbInformation, "PureLoX Kapazitaetsplaner"
+End Sub
+
+' =========================================================================
+' 2. KONFIGURATIONSBLATT
+' =========================================================================
+Sub Erstelle_Konfigurationsblatt(wb As Workbook)
+    Dim ws As Worksheet
+    Dim bgCI As Long
+    Dim startRow As Long
+
+    bgCI = RGB(236, 242, 248)
+
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    wb.Worksheets("Konfiguration").Delete
+    On Error GoTo 0
+    Application.DisplayAlerts = True
+
+    Set ws = wb.Worksheets.Add(Before:=wb.Sheets(1))
+    ws.Name = "Konfiguration"
+    ws.Cells.Font.Name = "Calibri"
+    ws.Cells.Font.Size = 11
+    ws.Cells.Interior.Color = bgCI
+    ActiveWindow.DisplayGridlines = False
+
+    ws.Range("A1:H1").Merge
+    ws.Rows(1).RowHeight = 36
+    With ws.Range("A1")
+        .Value = "PureLoX Kapazitaetsplanung - Konfiguration & Export"
+        .Font.Size = 15
+        .Font.Bold = True
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(0, 47, 94)
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+
+    ws.Rows(2).RowHeight = 8
+    startRow = 3
+
+    Call KonfigLabel(ws, startRow, "TITELSEITE DER PRAESENTATION")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Headline (Titel)", "Portfolio Kapazitaetsplanung")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Subheadline", "Uebersicht FTE & Projektphasen Q2/2026 - Q2/2027")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Praesentation fuer (Kundenname)", "")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Datum", Format(Now, "MMM YYYY"))
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Ersteller / Team", "BOOST - Customer Solutions Team")
+    startRow = startRow + 2
+
+    Call KonfigLabel(ws, startRow, "EXPORT-EINSTELLUNGEN")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Ausgabepfad (Ordner)", Environ("USERPROFILE") & "\Documents\")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Dateiname (ohne .pptx)", "PLX_Kapazitaetsplanung")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Node.js Pfad (meist: node)", "node")
+    startRow = startRow + 1
+    Call KonfigFeld(ws, startRow, "Pfad zu PLX_generate_pptx.js", "C:\PLX_Tools\PLX_generate_pptx.js")
+    startRow = startRow + 2
+
+    ws.Activate
+    ws.Rows(startRow).RowHeight = 38
+    Dim shpBtn As Shape
+    Set shpBtn = ws.Shapes.AddShape(msoShapeRoundedRectangle, _
+        CSng(ws.Cells(startRow, 2).Left), _
+        CSng(ws.Cells(startRow, 2).Top), _
+        CSng(240), CSng(28))
+    With shpBtn
+        .Fill.ForeColor.RGB = RGB(0, 47, 94)
+        .Line.Visible = msoFalse
+        .OnAction = "Exportiere_Als_JSON_Und_PPTX"
+        With .TextFrame.Characters
+            .Text = "PowerPoint exportieren"
+            .Font.Name = "Calibri"
+            .Font.Size = 11
+            .Font.Bold = True
+            .Font.Color = RGB(255, 255, 255)
+        End With
+        .TextFrame.HorizontalAlignment = xlHAlignCenter
+        .TextFrame.VerticalAlignment = xlVAlignCenter
+    End With
+    startRow = startRow + 2
+
+    With ws.Cells(startRow, 2)
+        .Value = "Tipp: Fuelle alle Projektblaetter aus, dann 'PowerPoint exportieren' klicken."
+        .Font.Italic = True
+        .Font.Color = RGB(80, 100, 130)
+        .Font.Size = 10
+    End With
+
+    ws.Columns(1).ColumnWidth = 2
+    ws.Columns(2).ColumnWidth = 38
+    ws.Columns(3).ColumnWidth = 45
+    ws.Columns("D:H").ColumnWidth = 6
+End Sub
+
+Private Sub KonfigLabel(ws As Worksheet, r As Long, label As String)
+    ws.Rows(r).RowHeight = 26
+    With ws.Cells(r, 2)
+        .Value = label
+        .Font.Bold = True
+        .Font.Size = 10
+        .Font.Color = RGB(0, 47, 94)
+    End With
+    ws.Range(ws.Cells(r, 2), ws.Cells(r, 7)).Interior.Color = RGB(200, 215, 235)
+End Sub
+
+Private Sub KonfigFeld(ws As Worksheet, r As Long, label As String, defaultVal As String)
+    ws.Rows(r).RowHeight = 22
+    With ws.Cells(r, 2)
+        .Value = label
+        .Font.Color = RGB(40, 60, 90)
+    End With
+    With ws.Cells(r, 3)
+        .Value = defaultVal
+        .Interior.Color = RGB(255, 255, 255)
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).Color = RGB(0, 124, 193)
+        .Borders(xlEdgeBottom).Weight = xlThin
+        .Font.Color = RGB(0, 47, 94)
+        .Font.Bold = True
+        .Locked = False
+    End With
+End Sub
+
+' =========================================================================
+' 3. JSON-EXPORT + PPTX-GENERIERUNG
+' =========================================================================
+Sub Exportiere_Als_JSON_Und_PPTX()
+    Dim wb As Workbook
+    Dim wsKonfig As Worksheet
+    Dim wsProj As Worksheet
+    Dim headline As String
+    Dim subheadline As String
+    Dim kundenname As String
+    Dim datum As String
+    Dim ersteller As String
+    Dim outputPfad As String
+    Dim dateiname As String
+    Dim nodePfad As String
+    Dim skriptPfad As String
+    Dim monate As Variant
+    Dim projektJson As String
+    Dim projName As String
+    Dim json As String
+    Dim jsonPfad As String
+    Dim pptxAusgabe As String
+    Dim befehl As String
+    Dim logPfad As String
+    Dim ersterProjekt As Boolean
+    Dim i As Long
+    Dim col As Long
+    Dim fileNr As Integer
+    Dim exitCode As Long
+    Dim wshell As Object
+    ' Teilprojekt-Variablen
+    Dim tpStartRows As Variant
+    Dim tpFteRows As Variant
+    Dim tpArrayJson As String
+    Dim tpPhasenJson As String
+    Dim tpFteJson As String
+    Dim tpName As String
+    Dim tpKuerzel As String
+    Dim tpCellVal As String
+    Dim tpFteVal As Double
+    Dim tpHeaderRow As Long
+    Dim tpFteRow As Long
+    Dim subRow As Long
+    Dim tp As Long
+    Dim firstTP As Boolean
+    Dim firstTpPhase As Boolean
+    Dim firstTpFte As Boolean
+    Dim fteSumJson As String
+    Dim firstFteSumme As Boolean
+    Dim fteSumVal As Double
+
+    Set wb = ActiveWorkbook
+    Set wsKonfig = wb.Worksheets("Konfiguration")
+
+    headline = Trim(wsKonfig.Cells(4, 3).Value)
+    subheadline = Trim(wsKonfig.Cells(5, 3).Value)
+    kundenname = Trim(wsKonfig.Cells(6, 3).Value)
+    datum = Trim(wsKonfig.Cells(7, 3).Value)
+    ersteller = Trim(wsKonfig.Cells(8, 3).Value)
+    outputPfad = Trim(wsKonfig.Cells(11, 3).Value)
+    dateiname = Trim(wsKonfig.Cells(12, 3).Value)
+    nodePfad = Trim(wsKonfig.Cells(13, 3).Value)
+    skriptPfad = Trim(wsKonfig.Cells(14, 3).Value)
+
+    If Len(headline) = 0 Then headline = "Portfolio Kapazitaetsplanung"
+    If Len(dateiname) = 0 Then dateiname = "PLX_Kapazitaetsplanung"
+    If Len(nodePfad) = 0 Then nodePfad = "node"
+    If Len(outputPfad) = 0 Then outputPfad = Environ("USERPROFILE") & "\Documents\"
+    If Right(outputPfad, 1) <> "\" Then outputPfad = outputPfad & "\"
+
+    monate = Array("Apr 26", "Mai 26", "Jun 26", "Jul 26", "Aug 26", "Sep 26", _
+                   "Okt 26", "Nov 26", "Dez 26", "Jan 27", "Feb 27", "Mrz 27", "Apr 27", "Mai 27")
+
+    ' Teilprojekt-Zeilen (Sub-Zeilen OHNE Header-Zeile)
+    tpStartRows = Array(5, 11, 17)   ' Erste Sub-Zeile jedes TPs
+    tpFteRows = Array(24, 25, 26)    ' FTE-Zeilen der drei TPs
+
+    projektJson = "["
+    ersterProjekt = True
+
+    For i = 1 To 12
+        Set wsProj = Nothing
+        On Error Resume Next
+        Set wsProj = wb.Worksheets("Projekt " & Format(i, "00"))
+        On Error GoTo 0
+
+        If Not wsProj Is Nothing Then
+
+            ' Projektname aus Zelle A1 lesen
+            projName = Trim(CStr(wsProj.Cells(1, 1).Value))
+            If Len(projName) = 0 Then projName = "Projekt " & Format(i, "00")
+
+            ' ---------------------------------------------------
+            ' Teilprojekte
+            ' ---------------------------------------------------
+            tpArrayJson = "["
+            firstTP = True
+
+            For tp = 0 To 2
+                tpHeaderRow = CLng(tpStartRows(tp)) - 1
+
+                tpName = Trim(CStr(wsProj.Cells(tpHeaderRow, 1).Value))
+                If Len(tpName) = 0 Then tpName = "Teilprojekt " & (tp + 1)
+
+                ' Phasen
+                tpPhasenJson = "{"
+                firstTpPhase = True
+                For col = 2 To 15
+                    tpKuerzel = ""
+                    For subRow = CLng(tpStartRows(tp)) To CLng(tpStartRows(tp)) + 4
+                        tpCellVal = Trim(CStr(wsProj.Cells(subRow, col).Value))
+                        If tpCellVal = "p" Or tpCellVal = "k" Or _
+                           tpCellVal = "t" Or tpCellVal = "g" Or tpCellVal = "?" Then
+                            tpKuerzel = tpCellVal
+                            Exit For
+                        End If
+                    Next subRow
+                    If Len(tpKuerzel) > 0 Then
+                        If Not firstTpPhase Then tpPhasenJson = tpPhasenJson & ","
+                        tpPhasenJson = tpPhasenJson & _
+                            """" & EscapeJson(CStr(monate(CLng(col - 2)))) & """:" & _
+                            """" & tpKuerzel & """"
+                        firstTpPhase = False
+                    End If
+                Next col
+                tpPhasenJson = tpPhasenJson & "}"
+
+                ' FTE
+                tpFteJson = "{"
+                firstTpFte = True
+                tpFteRow = CLng(tpFteRows(tp))
+                For col = 2 To 15
+                    tpFteVal = 0
+                    On Error Resume Next
+                    tpFteVal = CDbl(wsProj.Cells(tpFteRow, col).Value)
+                    On Error GoTo 0
+                    If tpFteVal > 0 Then
+                        If Not firstTpFte Then tpFteJson = tpFteJson & ","
+                        tpFteJson = tpFteJson & _
+                            """" & EscapeJson(CStr(monate(CLng(col - 2)))) & """:" & _
+                            Replace(CStr(tpFteVal), ",", ".")
+                        firstTpFte = False
+                    End If
+                Next col
+                tpFteJson = tpFteJson & "}"
+
+                ' Nur TPs mit Daten exportieren
+                If tpPhasenJson <> "{}" Or tpFteJson <> "{}" Then
+                    If Not firstTP Then tpArrayJson = tpArrayJson & ","
+                    tpArrayJson = tpArrayJson & _
+                        "{""name"":""" & EscapeJson(tpName) & """," & _
+                        """phasen"":" & tpPhasenJson & "," & _
+                        """fte"":" & tpFteJson & "}"
+                    firstTP = False
+                End If
+            Next tp
+            tpArrayJson = tpArrayJson & "]"
+
+            ' ---------------------------------------------------
+            ' FTE-Summe (Zeile 27)
+            ' ---------------------------------------------------
+            fteSumJson = "{"
+            firstFteSumme = True
+            For col = 2 To 15
+                fteSumVal = 0
+                On Error Resume Next
+                fteSumVal = CDbl(wsProj.Cells(27, col).Value)
+                On Error GoTo 0
+                If fteSumVal > 0 Then
+                    If Not firstFteSumme Then fteSumJson = fteSumJson & ","
+                    fteSumJson = fteSumJson & _
+                        """" & EscapeJson(CStr(monate(CLng(col - 2)))) & """:" & _
+                        Replace(CStr(fteSumVal), ",", ".")
+                    firstFteSumme = False
+                End If
+            Next col
+            fteSumJson = fteSumJson & "}"
+
+            If Not ersterProjekt Then projektJson = projektJson & ","
+            projektJson = projektJson & _
+                "{""name"":""" & EscapeJson(projName) & """," & _
+                """teilprojekte"":" & tpArrayJson & "," & _
+                """fteSumme"":" & fteSumJson & "}"
+            ersterProjekt = False
+        End If
+        Set wsProj = Nothing
+    Next i
+    projektJson = projektJson & "]"
+
+    ' ---------------------------------------------------
+    ' JSON zusammenbauen und schreiben
+    ' ---------------------------------------------------
+    json = "{" & vbNewLine
+    json = json & "  ""titelseite"": {" & vbNewLine
+    json = json & "    ""headline"": """ & EscapeJson(headline) & """," & vbNewLine
+    json = json & "    ""subheadline"": """ & EscapeJson(subheadline) & """," & vbNewLine
+    json = json & "    ""praesentationFuer"": """ & EscapeJson(kundenname) & """," & vbNewLine
+    json = json & "    ""datum"": """ & EscapeJson(datum) & """," & vbNewLine
+    json = json & "    ""ersteller"": """ & EscapeJson(ersteller) & """" & vbNewLine
+    json = json & "  }," & vbNewLine
+    json = json & "  ""projekte"": " & projektJson & vbNewLine
+    json = json & "}"
+
+    jsonPfad = outputPfad & dateiname & "_config.json"
+    fileNr = FreeFile
+    Open jsonPfad For Output As #fileNr
+    Print #fileNr, json
+    Close #fileNr
+
+    pptxAusgabe = outputPfad & dateiname & ".pptx"
+
+    If Len(skriptPfad) > 0 And skriptPfad <> "C:\PLX_Tools\PLX_generate_pptx.js" Then
+        logPfad = outputPfad & "pptx_log.txt"
+        befehl = nodePfad & " """ & skriptPfad & """ """ & jsonPfad & """ """ & pptxAusgabe & """"
+        Set wshell = CreateObject("WScript.Shell")
+        exitCode = wshell.Run( _
+            "cmd /c " & befehl & " > """ & logPfad & """ 2>&1", _
+            0, True)
+
+        If exitCode = 0 Then
+            MsgBox "PowerPoint erfolgreich erstellt!" & vbNewLine & vbNewLine & _
+                   "Datei: " & pptxAusgabe, vbInformation, "Export erfolgreich"
+            On Error Resume Next
+            Shell "cmd /c start """" """ & pptxAusgabe & """", vbHide
+            On Error GoTo 0
+        Else
+            MsgBox "Fehler beim Export (Exit: " & exitCode & ")." & vbNewLine & _
+                   "JSON: " & jsonPfad & vbNewLine & _
+                   "Log:  " & outputPfad & "pptx_log.txt" & vbNewLine & vbNewLine & _
+                   "Pruefe Node.js Installation und Skript-Pfad.", _
+                   vbExclamation, "Export fehlgeschlagen"
+        End If
+    Else
+        MsgBox "JSON gespeichert:" & vbNewLine & vbNewLine & _
+               jsonPfad & vbNewLine & vbNewLine & _
+               "Fuehre dann manuell aus:" & vbNewLine & _
+               "  node PLX_generate_pptx.js """ & jsonPfad & """ """ & pptxAusgabe & """" & vbNewLine & vbNewLine & _
+               "Oder trage den Skript-Pfad im Konfigurationsblatt ein.", _
+               vbInformation, "JSON exportiert"
+    End If
+End Sub
+
+Private Function EscapeJson(s As String) As String
+    s = Replace(s, "\", "\\")
+    s = Replace(s, """", "\""")
+    s = Replace(s, Chr(10), "\n")
+    s = Replace(s, Chr(13), "")
+    EscapeJson = s
+End Function
+
+' =========================================================================
+' 4. PLANUNGSBLAETTER
+' =========================================================================
+Sub Erstelle_Planungsblaetter(wb As Workbook)
+    Dim wsGesamt As Worksheet
+    Dim wsProj As Worksheet
+    Dim wsLegende As Worksheet
+    Dim monate As Variant
+    Dim projektNamen(1 To 12) As String
+    Dim i As Long
+    Dim col As Long
+    Dim p As Long
+    Dim row As Long
+    Dim rGantt As Long
+    Dim rFTE As Long
+    Dim rowGesamt As Long
+    Dim rngGantt As Range
+    Dim rngFTE As Range
+    Dim rngGesamt As Range
+    Dim bgCI As Long
+    Dim r As Long
+
+    bgCI = RGB(236, 242, 248)
+
+    monate = Array("Teilprojekt / Phase", _
+                   "Apr 26", "Mai 26", "Jun 26", "Jul 26", "Aug 26", "Sep 26", _
+                   "Okt 26", "Nov 26", "Dez 26", "Jan 27", "Feb 27", "Mrz 27", "Apr 27", "Mai 27")
+
+    For i = 1 To 12
+        projektNamen(i) = "Projekt " & Format(i, "00")
+    Next i
+
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    wb.Worksheets("Legende").Delete
+    wb.Worksheets("Gesamtuebersicht").Delete
+    For i = 1 To 12
+        wb.Worksheets(projektNamen(i)).Delete
+    Next i
+    On Error GoTo 0
+    Application.DisplayAlerts = True
+
+    ' --- LEGENDE ---
+    Set wsLegende = wb.Worksheets.Add(After:=wb.Sheets("Konfiguration"))
+    wsLegende.Name = "Legende"
+    wsLegende.Cells.Font.Name = "Calibri"
+    wsLegende.Cells.Font.Size = 11
+    wsLegende.Cells.Interior.Color = bgCI
+    ActiveWindow.DisplayGridlines = False
+
+    wsLegende.Range("A1:G1").Merge
+    wsLegende.Rows(1).RowHeight = 34
+    With wsLegende.Range("A1")
+        .Value = "PureLoX Kapazitaetsplaner - Legende"
+        .Font.Bold = True
+        .Font.Size = 14
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(0, 47, 94)
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+
+    wsLegende.Cells(3, 2).Value = "GANTT: Phasenkuerzel"
+    wsLegende.Cells(3, 2).Font.Bold = True
+    wsLegende.Cells(3, 2).Font.Color = RGB(0, 47, 94)
+    wsLegende.Cells(4, 2).Value = "Kuerzel"
+    wsLegende.Cells(4, 3).Value = "Phase"
+    wsLegende.Range("B4:C4").Interior.Color = RGB(0, 47, 94)
+    wsLegende.Range("B4:C4").Font.Color = RGB(255, 255, 255)
+    wsLegende.Range("B4:C4").Font.Bold = True
+
+    wsLegende.Cells(5, 2).Value = "p":  wsLegende.Cells(5, 3).Value = "Pflichtenheft"
+    wsLegende.Cells(6, 2).Value = "k":  wsLegende.Cells(6, 3).Value = "Konfiguration"
+    wsLegende.Cells(7, 2).Value = "t":  wsLegende.Cells(7, 3).Value = "Test"
+    wsLegende.Cells(8, 2).Value = "g":  wsLegende.Cells(8, 3).Value = "GoLive"
+    wsLegende.Cells(9, 2).Value = "?":  wsLegende.Cells(9, 3).Value = "Meilenstein"
+
+    wsLegende.Cells(5, 2).Interior.Color = RGB(10, 85, 185):  wsLegende.Cells(5, 2).Font.Color = RGB(255, 255, 255)
+    wsLegende.Cells(6, 2).Interior.Color = RGB(40, 140, 225): wsLegende.Cells(6, 2).Font.Color = RGB(255, 255, 255)
+    wsLegende.Cells(7, 2).Interior.Color = RGB(195, 85, 215): wsLegende.Cells(7, 2).Font.Color = RGB(255, 255, 255)
+    wsLegende.Cells(8, 2).Interior.Color = RGB(205, 20, 90):  wsLegende.Cells(8, 2).Font.Color = RGB(255, 255, 255)
+    wsLegende.Cells(9, 2).Interior.Color = RGB(0, 47, 94):    wsLegende.Cells(9, 2).Font.Color = RGB(255, 255, 255)
+    For r = 5 To 9
+        wsLegende.Cells(r, 2).HorizontalAlignment = xlCenter
+        wsLegende.Rows(r).RowHeight = 20
+    Next r
+
+    wsLegende.Cells(11, 2).Value = "FTE HEATMAP: Auslastung"
+    wsLegende.Cells(11, 2).Font.Bold = True
+    wsLegende.Cells(11, 2).Font.Color = RGB(0, 47, 94)
+    wsLegende.Cells(12, 2).Value = "> 2 FTE":      wsLegende.Cells(12, 2).Interior.Color = RGB(245, 200, 215): wsLegende.Cells(12, 2).Font.Color = RGB(150, 10, 60)
+    wsLegende.Cells(13, 2).Value = "1.5 - 2 FTE":  wsLegende.Cells(13, 2).Interior.Color = RGB(235, 205, 240): wsLegende.Cells(13, 2).Font.Color = RGB(120, 30, 140)
+    wsLegende.Cells(14, 2).Value = "1 - 1.5 FTE":  wsLegende.Cells(14, 2).Interior.Color = RGB(200, 225, 245): wsLegende.Cells(14, 2).Font.Color = RGB(10, 85, 185)
+    wsLegende.Cells(15, 2).Value = "0 - 1 FTE":    wsLegende.Cells(15, 2).Interior.Color = RGB(220, 245, 250): wsLegende.Cells(15, 2).Font.Color = RGB(20, 120, 160)
+    wsLegende.Cells(16, 2).Value = "0 / leer":     wsLegende.Cells(16, 2).Font.Color = RGB(180, 190, 200)
+    wsLegende.Columns(2).ColumnWidth = 20
+    wsLegende.Columns(3).ColumnWidth = 22
+
+    ' --- GESAMTUEBERSICHT ---
+    Set wsGesamt = wb.Worksheets.Add(After:=wsLegende)
+    wsGesamt.Name = "Gesamtuebersicht"
+    wsGesamt.Cells.Font.Name = "Calibri"
+    wsGesamt.Cells.Font.Size = 11
+    wsGesamt.Cells.Interior.Color = bgCI
+    ActiveWindow.DisplayGridlines = False
+
+    For col = 0 To UBound(monate)
+        With wsGesamt.Cells(1, col + 1)
+            .NumberFormat = "@"
+            .Value = monate(col)
+            .Font.Bold = True
+            .Font.Color = RGB(255, 255, 255)
+            .Interior.Color = RGB(0, 47, 94)
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+        End With
+    Next col
+    wsGesamt.Rows(1).RowHeight = 26
+    rowGesamt = 2
+
+    ' --- 12 PROJEKTBLAETTER ---
+    For i = 1 To 12
+        Set wsProj = wb.Worksheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+        wsProj.Name = projektNamen(i)
+        wsProj.Cells.Font.Name = "Calibri"
+        wsProj.Cells.Font.Size = 11
+        wsProj.Cells.Interior.Color = bgCI
+        ActiveWindow.DisplayGridlines = False
+
+        wsProj.Range("A1:O1").Merge
+        With wsProj.Range("A1")
+            .Value = projektNamen(i)
+            .Font.Bold = True
+            .Font.Size = 13
+            .Font.Color = RGB(255, 255, 255)
+            .Interior.Color = RGB(0, 47, 94)
+            .HorizontalAlignment = xlLeft
+            .VerticalAlignment = xlCenter
+            .IndentLevel = 1
+        End With
+        wsProj.Rows(1).RowHeight = 30
+
+        For col = 0 To UBound(monate)
+            With wsProj.Cells(2, col + 1)
+                .NumberFormat = "@"
+                .Value = monate(col)
+                .Font.Bold = True
+                .Font.Color = RGB(255, 255, 255)
+                .Interior.Color = RGB(0, 47, 94)
+                .HorizontalAlignment = xlCenter
+                .VerticalAlignment = xlCenter
+            End With
+        Next col
+        wsProj.Rows(2).RowHeight = 22
+
+        wsProj.Cells(3, 1).Value = "ZEITPLAN (PHASEN)"
+        wsProj.Cells(3, 1).Font.Color = RGB(120, 130, 140)
+        wsProj.Cells(3, 1).Font.Bold = True
+        wsProj.Cells(3, 1).Font.Size = 9
+        wsProj.Rows(3).RowHeight = 18
+
+        rGantt = 4
+        For p = 1 To 3
+            wsProj.Cells(rGantt, 1).Value = "Teilprojekt " & p
+            wsProj.Cells(rGantt, 1).Font.Bold = True
+            wsProj.Cells(rGantt, 1).Font.Color = RGB(0, 47, 94)
+            wsProj.Range(wsProj.Cells(rGantt, 1), wsProj.Cells(rGantt, 15)).Interior.Color = RGB(220, 228, 240)
+            wsProj.Rows(rGantt).RowHeight = 16
+            wsProj.Cells(rGantt + 1, 1).Value = "   Pflichtenheft"
+            wsProj.Cells(rGantt + 2, 1).Value = "   Konfiguration"
+            wsProj.Cells(rGantt + 3, 1).Value = "   Test"
+            wsProj.Cells(rGantt + 4, 1).Value = "   GoLive"
+            wsProj.Cells(rGantt + 5, 1).Value = "   Meilenstein"
+            For row = rGantt + 1 To rGantt + 5
+                wsProj.Rows(row).RowHeight = 19
+            Next row
+            rGantt = rGantt + 6
+        Next p
+
+        Set rngGantt = wsProj.Range("B4:O21")
+        Call Setze_Gantt_Formatierung(rngGantt)
+
+        wsProj.Rows(22).RowHeight = 10
+
+        wsProj.Cells(23, 1).Value = "KAPAZITAETSPLANUNG (FTE)"
+        wsProj.Cells(23, 1).Font.Color = RGB(120, 130, 140)
+        wsProj.Cells(23, 1).Font.Bold = True
+        wsProj.Cells(23, 1).Font.Size = 9
+        wsProj.Rows(23).RowHeight = 20
+
+        For col = 0 To UBound(monate)
+            With wsProj.Cells(23, col + 1)
+                .NumberFormat = "@"
+                .Value = monate(col)
+                .Font.Bold = True
+                .Font.Color = RGB(255, 255, 255)
+                .Interior.Color = RGB(0, 124, 193)
+                .HorizontalAlignment = xlCenter
+            End With
+        Next col
+
+        rFTE = 23
+        wsProj.Cells(rFTE + 1, 1).Value = "Teilprojekt 1"
+        wsProj.Cells(rFTE + 2, 1).Value = "Teilprojekt 2"
+        wsProj.Cells(rFTE + 3, 1).Value = "Teilprojekt 3"
+        For row = rFTE + 1 To rFTE + 3
+            wsProj.Rows(row).RowHeight = 20
+        Next row
+
+        wsProj.Cells(rFTE + 4, 1).Value = "SUMME " & UCase(projektNamen(i))
+        wsProj.Cells(rFTE + 4, 1).Font.Bold = True
+        wsProj.Rows(rFTE + 4).RowHeight = 20
+
+        For col = 2 To 15
+            wsProj.Cells(rFTE + 4, col).FormulaR1C1 = "=SUM(R[-3]C:R[-1]C)"
+            With wsProj.Cells(rFTE + 4, col)
+                .Font.Bold = True
+                .Interior.Color = RGB(0, 47, 94)
+                .Font.Color = RGB(255, 255, 255)
+            End With
+            wsGesamt.Cells(rowGesamt, 1).Value = projektNamen(i) & " (FTE)"
+            wsGesamt.Cells(rowGesamt, col).Formula = _
+                "='" & projektNamen(i) & "'!" & wsProj.Cells(rFTE + 4, col).Address(False, False)
+        Next col
+        rowGesamt = rowGesamt + 1
+
+        Set rngFTE = wsProj.Range("B24:O26")
+        Call Setze_FTE_Formatierung(rngFTE)
+        rngFTE.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        rngFTE.Borders(xlInsideHorizontal).Color = RGB(210, 215, 225)
+        rngFTE.Borders(xlInsideVertical).LineStyle = xlContinuous
+        rngFTE.Borders(xlInsideVertical).Color = RGB(210, 215, 225)
+
+        wsProj.Columns(1).ColumnWidth = 28
+        wsProj.Columns("B:O").ColumnWidth = 9
+        Set wsProj = Nothing
+    Next i
+
+    wsGesamt.Cells(rowGesamt, 1).Value = "GESAMT PORTFOLIO FTE"
+    wsGesamt.Cells(rowGesamt, 1).Font.Bold = True
+    wsGesamt.Rows(rowGesamt).RowHeight = 22
+
+    For col = 2 To 15
+        wsGesamt.Cells(rowGesamt, col).FormulaR1C1 = "=SUM(R2C:R[-1]C)"
+        With wsGesamt.Cells(rowGesamt, col)
+            .Font.Bold = True
+            .Interior.Color = RGB(0, 47, 94)
+            .Font.Color = RGB(255, 255, 255)
+        End With
+    Next col
+
+    Set rngGesamt = wsGesamt.Range("B2:O" & rowGesamt - 1)
+    Call Setze_FTE_Formatierung(rngGesamt)
+    wsGesamt.Columns(1).ColumnWidth = 28
+    wsGesamt.Columns("B:O").ColumnWidth = 9
+    rngGesamt.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+    rngGesamt.Borders(xlInsideHorizontal).Color = RGB(210, 215, 225)
+    rngGesamt.Borders(xlInsideVertical).LineStyle = xlContinuous
+    rngGesamt.Borders(xlInsideVertical).Color = RGB(210, 215, 225)
+End Sub
+
+' =========================================================================
+' GANTT BEDINGTE FORMATIERUNG
+' =========================================================================
+Sub Setze_Gantt_Formatierung(rng As Range)
+    rng.FormatConditions.Delete
+    rng.HorizontalAlignment = xlCenter
+    rng.VerticalAlignment = xlCenter
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""p""")
+        .Interior.Color = RGB(10, 85, 185):  .Font.Color = RGB(10, 85, 185)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""k""")
+        .Interior.Color = RGB(40, 140, 225): .Font.Color = RGB(40, 140, 225)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""t""")
+        .Interior.Color = RGB(195, 85, 215): .Font.Color = RGB(195, 85, 215)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""g""")
+        .Interior.Color = RGB(205, 20, 90):  .Font.Color = RGB(205, 20, 90)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="=""?""")
+        .Interior.Color = RGB(0, 47, 94):    .Font.Color = RGB(0, 47, 94)
+    End With
+End Sub
+
+' =========================================================================
+' FTE HEATMAP BEDINGTE FORMATIERUNG
+' =========================================================================
+Sub Setze_FTE_Formatierung(rng As Range)
+    rng.FormatConditions.Delete
+    rng.HorizontalAlignment = xlCenter
+    rng.VerticalAlignment = xlCenter
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlGreater, Formula1:="2")
+        .Interior.Color = RGB(245, 200, 215): .Font.Color = RGB(150, 10, 60): .Font.Bold = True
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlBetween, Formula1:="1.5", Formula2:="2")
+        .Interior.Color = RGB(235, 205, 240): .Font.Color = RGB(120, 30, 140)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlBetween, Formula1:="1", Formula2:="1.49")
+        .Interior.Color = RGB(200, 225, 245): .Font.Color = RGB(10, 85, 185)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlBetween, Formula1:="0.01", Formula2:="0.99")
+        .Interior.Color = RGB(220, 245, 250): .Font.Color = RGB(20, 120, 160)
+    End With
+    With rng.FormatConditions.Add(Type:=xlCellValue, Operator:=xlEqual, Formula1:="0")
+        .Font.Color = RGB(180, 190, 200)
+    End With
+End Sub
