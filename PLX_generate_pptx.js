@@ -445,7 +445,7 @@ projekte.forEach((proj, idx) => {
     targetSlide.addTable(fteTableRows, {
       x: tX, y: startY, w: tW, colW,
       rowH: rH,
-      border:{ pt:0, color:"FFFFFF" },
+      border:{ pt:0.3, color:"D0D8E4" },
       fontFace:"Calibri", color:CI.text,
       fill:{ color:CI.white }
     });
@@ -454,7 +454,7 @@ projekte.forEach((proj, idx) => {
   if (useTwoSlides) {
     // === Folie A: Gantt-Diagramm ===
     const slideA = pres.addSlide();
-    addFrameLight(pres, slideA, proj.name || `Projekt ${idx+1}`, pageCounter++);
+    addFrameNavy(pres, slideA, proj.name || `Projekt ${idx+1}`, pageCounter++);
     const availH_gantt = L.footerY - ganttY - 0.18;
     const rowH_A       = Math.min(0.45, Math.max(0.18, availH_gantt / ganttNRows));
     const fontSize_A   = rowH_A >= 0.22 ? 8 : 7;
@@ -463,8 +463,8 @@ projekte.forEach((proj, idx) => {
     // === Folie B: Kapazitätsplanung (FTE) ===
     const slideB = pres.addSlide();
     const titleB = (proj.name || `Projekt ${idx+1}`) + " – Kapazitätsplanung";
-    addFrameLight(pres, slideB, titleB, pageCounter++);
-    const availH_fte = L.footerY - ganttY - 0.06;
+    addFrameNavy(pres, slideB, titleB, pageCounter++);
+    const availH_fte = L.footerY - ganttY - labelGap - 0.06;
     const rowH_B     = Math.min(0.70, Math.max(0.25, availH_fte / fteNRows));
     const fontSize_B = rowH_B >= 0.45 ? 10 : rowH_B >= 0.22 ? 8 : 7;
     renderFte(slideB, rowH_B, fontSize_B, ganttY + labelGap);
@@ -472,7 +472,7 @@ projekte.forEach((proj, idx) => {
   } else {
     // === Einzelfolie: Gantt + FTE ===
     const slide = pres.addSlide();
-    addFrameLight(pres, slide, proj.name || `Projekt ${idx+1}`, pageCounter++);
+    addFrameNavy(pres, slide, proj.name || `Projekt ${idx+1}`, pageCounter++);
     const rowH   = rowH_single;
     const fontSize = rowH >= 0.20 ? 8 : 7;
     renderGantt(slide, rowH, fontSize, ganttY);
