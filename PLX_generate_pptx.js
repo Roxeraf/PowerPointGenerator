@@ -345,9 +345,7 @@ projekte.forEach((proj, idx) => {
     phasenOrder.filter(ph => MONATE.some(m => (tp.phasen || {})[m] === ph))
   );
   const tpPhaseRows = renderTPs.map((_, i) =>
-    nTPs >= 3
-      ? (tpActivePhases[i].length > 0 ? tpActivePhases[i] : phasenOrder)
-      : phasenOrder
+    tpActivePhases[i].length > 0 ? tpActivePhases[i] : phasenOrder
   );
 
   const ganttNRows = 1 + tpPhaseRows.reduce((s, phases) => s + 1 + phases.length, 0);
