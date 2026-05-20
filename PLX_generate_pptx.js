@@ -288,7 +288,7 @@ const legendRows = [
 ];
 slideL.addTable(legendRows, {
   x: 0.35, y: LY, w: 4.5, colW:[1.9,0.8,1.8],
-  border:{pt:0.5,color:"D0D8E4"}, fontFace:"Calibri", color:CI.text,
+  border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", color:CI.text,
   fill:{color:CI.white}, rowH: 0.36
 });
 
@@ -304,7 +304,7 @@ const hR = [
 ];
 slideL.addTable(hR, {
   x:5.3, y:LY+0.38, w:3.8,
-  border:{pt:0.5,color:"D0D8E4"}, fontFace:"Calibri", rowH:0.33
+  border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", rowH:0.33
 });
 
 // =========================================================================
@@ -383,7 +383,7 @@ projekte.forEach((proj, idx) => {
     targetSlide.addTable(ganttRows, {
       x: tX, y: startY, w: tW, colW,
       rowH: rH,
-      border: { pt: 0.3, color: "D0D8E4" },
+      border: { pt: 0, color: "FFFFFF" },
       fontFace: "Calibri", color: CI.text,
       fill: { color: CI.white }
     });
@@ -445,7 +445,7 @@ projekte.forEach((proj, idx) => {
     targetSlide.addTable(fteTableRows, {
       x: tX, y: startY, w: tW, colW,
       rowH: rH,
-      border:{ pt:0.3, color:"D0D8E4" },
+      border:{ pt:0, color:"FFFFFF" },
       fontFace:"Calibri", color:CI.text,
       fill:{ color:CI.white }
     });
@@ -529,7 +529,7 @@ gesamtRows.push(sumG);
 
 slideG.addTable(gesamtRows, {
   x: tX2, y: L.contentY, w: tW2, colW: colW2, rowH: rowH2,
-  border:{pt:0.3,color:"D0D8E4"}, fontFace:"Calibri", color:CI.text,
+  border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", color:CI.text,
   fill:{color:CI.white}
 });
 
