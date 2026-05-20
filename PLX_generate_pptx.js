@@ -344,17 +344,32 @@ projekte.forEach((proj, idx) => {
     ? [{ name: proj.name || "Gesamt", phasen: proj.phasen || {}, fte: proj.fte || {} }]
     : activeTPs;
 
-  // Dynamische Zeilenhöhe: TP-Header + 5 Phasenzeilen pro TP
-  const nTPs       = renderTPs.length;
-  const ganttNRows = 1 + nTPs * 6;     // Kopfzeile + (TP-Header + 5 Phasen) pro TP
+  // Bei <=2 TPs: alle 5 Phasenzeilen pro TP (Original-Verhalten, füllt die Folie optimal).
+  // Bei >=3 TPs: nur Phasenzeilen mit tatsächlichen Daten anzeigen, damit die
+  // Zeilenhöhe deutlich größer und die Folie besser lesbar bleibt.
+  const nTPs = renderTPs.length;
+  const tpActivePhases = renderTPs.map(tp =>
+    phasenOrder.filter(ph => MONATE.some(m => (tp.phasen || {})[m] === ph))
+  );
+  const tpPhaseRows = renderTPs.map((_, i) =>
+    nTPs >= 3
+      ? (tpActivePhases[i].length > 0 ? tpActivePhases[i] : phasenOrder)
+      : phasenOrder
+  );
+
+  // Dynamische Zeilenhöhe basierend auf tatsächlicher Anzahl Phasenzeilen
+  const ganttNRows = 1 + tpPhaseRows.reduce((s, phases) => s + 1 + phases.length, 0);
   const fteNRows   = 1 + nTPs + 1;     // Kopfzeile + 1 Zeile pro TP + SUMME
   const labelGap   = 0.18;
   const availH     = L.footerY - L.contentY - labelGap - 0.06;
-  const rowH       = Math.min(0.28, Math.max(0.12, availH / (ganttNRows + fteNRows)));
+  const maxRowH    = nTPs >= 3 ? 0.38 : 0.28;
+  const rowH       = Math.min(maxRowH, Math.max(0.12, availH / (ganttNRows + fteNRows)));
   const fontSize   = rowH >= 0.20 ? 8 : 7;
 
-  // --- GANTT TABELLE: TP-Header + 5 Phasenzeilen pro TP ---
+  // --- GANTT TABELLE: TP-Header + nur aktive Phasenzeilen ---
   const ganttRows = [gHeader];
+  const pillRowMap = new Map(); // "tpIdx-phase" -> Zeilenindex im ganttRows-Array
+
   renderTPs.forEach((tp, tpIdx) => {
     const tpHdrRow = [{
       text: tp.name || `Teilprojekt ${tpIdx+1}`,
@@ -362,13 +377,14 @@ projekte.forEach((proj, idx) => {
     }];
     MONATE.forEach(() => tpHdrRow.push({ text:"", options:{ fill:{color:"D4DEEC"} }}));
     ganttRows.push(tpHdrRow);
-    phasenOrder.forEach(ph => {
+    tpPhaseRows[tpIdx].forEach(ph => {
       const row = [{
         text: "  " + (CI.phase[ph]?.label || ph),
         options:{ color:CI.text, fontSize, align:"left" }
       }];
       MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.white} }}));
       ganttRows.push(row);
+      pillRowMap.set(`${tpIdx}-${ph}`, ganttRows.length - 1);
     });
   });
 
@@ -380,16 +396,14 @@ projekte.forEach((proj, idx) => {
     fill: { color: CI.white }
   });
 
-  // --- PILL-SHAPES: Phase-Zeile aus phasenOrder ableiten ---
+  // --- PILL-SHAPES: Position über pillRowMap ermitteln ---
   const pillPadX = 0.02;
   renderTPs.forEach((tp, tpIdx) => {
     MONATE.forEach((m, mIdx) => {
       const key = (tp.phasen || {})[m];
       if (!key || !CI.phase[key]) return;
-      const phaseIdx = phasenOrder.indexOf(key);
-      if (phaseIdx < 0) return;
-      // Zeilenindex: 1 (Gantt-Header) + tpIdx*6 (vorherige TPs) + 1 (TP-Header) + phaseIdx
-      const rowIdx  = 1 + tpIdx * 6 + 1 + phaseIdx;
+      const rowIdx = pillRowMap.get(`${tpIdx}-${key}`);
+      if (rowIdx === undefined) return;
       const pillH   = rowH * 0.68;
       const pillOffY = (rowH - pillH) / 2;
       slide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
