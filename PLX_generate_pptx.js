@@ -95,8 +95,11 @@ const CI = {
   }
 };
 
-const MONATE = ["Apr 26","Mai 26","Jun 26","Jul 26","Aug 26","Sep 26",
-                "Okt 26","Nov 26","Dez 26","Jan 27","Feb 27","Mrz 27","Apr 27","Mai 27"];
+// Dynamische Monate aus JSON (VBA exportiert config.monate); Fallback auf Hardcode
+const MONATE = (config.monate && config.monate.length > 0)
+  ? config.monate
+  : ["Apr 26","Mai 26","Jun 26","Jul 26","Aug 26","Sep 26",
+     "Okt 26","Nov 26","Dez 26","Jan 27","Feb 27","Mrz 27","Apr 27","Mai 27"];
 
 function fteColor(val) {
   if (!val || val === 0) return CI.fte.zero;
