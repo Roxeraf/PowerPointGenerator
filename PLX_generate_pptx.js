@@ -353,53 +353,77 @@ projekte.forEach((proj, idx) => {
   const labelGap   = 0.18;
 
   // Check if content fits comfortably on one slide
-  const availH_single = L.footerY - ganttY - labelGap - 0.06;
-  const rowH_single   = Math.min(0.38, Math.max(0.12, availH_single / (ganttNRows + fteNRows)));
+  // availH_single: space for Gantt + labelGap + FTE on one slide (0.04" safety margin).
+  // rowH_single is capped so all rows fit without overflow.
+  const availH_single = L.footerY - ganttY - labelGap - 0.04;
+  const rowH_single   = Math.min(0.38, availH_single / (ganttNRows + fteNRows));
   const useTwoSlides  = nTPs >= 3 || rowH_single < 0.24;
 
-  // --- Helper: render Gantt table + pills onto a slide ---
+  // --- Helper: render Gantt rows + pills onto a slide ---
+  // Uses individual addShape/addText calls (not addTable) so pill Y coordinates
+  // are bound to the exact same curY used for each text row — no cumulative offset.
   const renderGantt = (targetSlide, rH, rFontSize, startY) => {
-    const ganttRows = [gHeader];
-    const pillRowMap = new Map();
+    const pillRowYMap = new Map(); // "tpIdx-ph" → exact top-Y of that row
+    const pillPadX = 0.02;
+    let curY = startY;
 
+    // --- Month header row (navy background) ---
+    targetSlide.addShape(pres.shapes.RECTANGLE, {
+      x: tX, y: curY, w: tW, h: rH,
+      fill: { color: CI.navy }, line: { color: CI.navy, width: 0 }
+    });
+    MONATE.forEach((m, mIdx) => {
+      targetSlide.addText(m, {
+        x: tX + lbW + mIdx * mW, y: curY, w: mW, h: rH,
+        color: CI.white, fontSize: rFontSize, fontFace: "Calibri", bold: true,
+        align: "center", valign: "middle", margin: 0
+      });
+    });
+    curY += rH;
+
+    // --- TP groups ---
     renderTPs.forEach((tp, tpIdx) => {
-      const tpHdrRow = [{
-        text: tp.name || `Teilprojekt ${tpIdx+1}`,
-        options:{ fill:{color:"D4DEEC"}, color:CI.navy, bold:true, fontSize:rFontSize, align:"left" }
-      }];
-      MONATE.forEach(() => tpHdrRow.push({ text:"", options:{ fill:{color:"D4DEEC"} }}));
-      ganttRows.push(tpHdrRow);
+      // Gray separator row for TP name — intentionally empty (no pills)
+      targetSlide.addShape(pres.shapes.RECTANGLE, {
+        x: tX, y: curY, w: tW, h: rH,
+        fill: { color: "D4DEEC" }, line: { color: "D4DEEC", width: 0 }
+      });
+      targetSlide.addText(tp.name || `Teilprojekt ${tpIdx + 1}`, {
+        x: tX + 0.06, y: curY, w: lbW - 0.06, h: rH,
+        color: CI.navy, fontSize: rFontSize, fontFace: "Calibri", bold: true,
+        valign: "middle", margin: 0
+      });
+      curY += rH;
+
+      // Phase rows — white background, label left, pills right
       tpPhaseRows[tpIdx].forEach(ph => {
-        const row = [{
-          text: "  " + (CI.phase[ph]?.label || ph),
-          options:{ fill:{color:CI.white}, color:CI.text, fontSize:rFontSize, align:"left" }
-        }];
-        MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.white} }}));
-        ganttRows.push(row);
-        pillRowMap.set(`${tpIdx}-${ph}`, ganttRows.length - 1);
+        targetSlide.addShape(pres.shapes.RECTANGLE, {
+          x: tX, y: curY, w: tW, h: rH,
+          fill: { color: CI.white }, line: { color: CI.white, width: 0 }
+        });
+        targetSlide.addText("  " + (CI.phase[ph]?.label || ph), {
+          x: tX, y: curY, w: lbW, h: rH,
+          color: CI.text, fontSize: rFontSize, fontFace: "Calibri",
+          valign: "middle", margin: 0
+        });
+        // Record the exact Y so pills land on this row and nowhere else
+        pillRowYMap.set(`${tpIdx}-${ph}`, curY);
+        curY += rH;
       });
     });
 
-    targetSlide.addTable(ganttRows, {
-      x: tX, y: startY, w: tW, h: ganttRows.length * rH, colW,
-      rowH: rH,
-      border: { pt: 0, color: "FFFFFF" },
-      fontFace: "Calibri", color: CI.text,
-      fill: { color: CI.white }
-    });
-
-    const pillPadX = 0.02;
+    // --- Pills: Y is read directly from pillRowYMap, never calculated separately ---
     renderTPs.forEach((tp, tpIdx) => {
       MONATE.forEach((m, mIdx) => {
         const key = (tp.phasen || {})[m];
         if (!key || !CI.phase[key]) return;
-        const rowIdx = pillRowMap.get(`${tpIdx}-${key}`);
-        if (rowIdx === undefined) return;
+        const rowY = pillRowYMap.get(`${tpIdx}-${key}`);
+        if (rowY === undefined) return; // phase not in this TP → skip (never on header rows)
         const pillH    = rH * 0.68;
         const pillOffY = (rH - pillH) / 2;
         targetSlide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
           x: tX + lbW + mIdx * mW + pillPadX,
-          y: startY + rowIdx * rH + pillOffY,
+          y: rowY + pillOffY,
           w: mW - 2 * pillPadX,
           h: pillH,
           fill: { color: CI.phase[key].bg },
@@ -455,8 +479,10 @@ projekte.forEach((proj, idx) => {
     // === Folie A: Gantt-Diagramm ===
     const slideA = pres.addSlide();
     addFrameLight(pres, slideA, proj.name || `Projekt ${idx+1}`, pageCounter++);
-    const availH_gantt = L.footerY - ganttY - 0.50;
-    const rowH_A       = Math.min(0.40, Math.max(0.13, availH_gantt / ganttNRows));
+    // availH_gantt: full space from ganttY to footer, minus a tiny 0.04" safety margin.
+    // rowH_A is capped so ganttNRows * rowH_A never exceeds availH_gantt (no overflow).
+    const availH_gantt = L.footerY - ganttY - 0.04;
+    const rowH_A       = Math.min(0.40, availH_gantt / ganttNRows);
     const fontSize_A   = rowH_A >= 0.22 ? 8 : 7;
     renderGantt(slideA, rowH_A, fontSize_A, ganttY);
 
