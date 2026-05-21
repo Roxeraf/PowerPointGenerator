@@ -335,14 +335,21 @@ projekte.forEach((proj, idx) => {
 
   // Aktive TPs (mit Daten); Fallback auf altes JSON-Format ohne teilprojekte
   const allTPs = proj.teilprojekte || [];
-  const useLegacy = allTPs.length === 0 && (proj.phasen || proj.fte);
+  const activeTPs = allTPs.filter(tp =>
+    Object.keys(tp.phasen || {}).length > 0 || Object.keys(tp.fte || {}).length > 0
+  );
+  const useLegacy = activeTPs.length === 0 && (proj.phasen || proj.fte);
   const renderTPs = useLegacy
     ? [{ name: proj.name || "Gesamt", phasen: proj.phasen || {}, fte: proj.fte || {} }]
-    : allTPs;
+    : activeTPs;
 
   const nTPs = renderTPs.length;
-  // Alle 5 Phasenzeilen immer anzeigen, unabhängig davon welche Daten eingetragen sind
-  const tpPhaseRows = renderTPs.map(() => phasenOrder);
+  const tpActivePhases = renderTPs.map(tp =>
+    phasenOrder.filter(ph => MONATE.some(m => (tp.phasen || {})[m] === ph))
+  );
+  const tpPhaseRows = renderTPs.map((_, i) =>
+    tpActivePhases[i].length > 0 ? tpActivePhases[i] : phasenOrder
+  );
 
   const ganttNRows = 1 + tpPhaseRows.reduce((s, phases) => s + 1 + phases.length, 0);
   const fteNRows   = 1 + nTPs + 1;
