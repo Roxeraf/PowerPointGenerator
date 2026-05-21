@@ -63,8 +63,8 @@ const L = {
   contentX: 0.354, contentY: 1.024,
   contentW: 9.240, contentH: 4.048,
 
-  // Footer-Verlaufsstreifen (rId46 = image2.jpg)
-  footerX: 0, footerY: 5.354, footerW: 10, footerH: 0.047,
+  // Footer-Verlaufsstreifen (rId46 = image2.jpg) – nur pink/magenta rechts
+  footerX: 8.0, footerY: 5.354, footerW: 2.0, footerH: 0.047,
 
   // Copyright-Text
   copyrightX: 0.354, copyrightY: 5.433, copyrightW: 1.142, copyrightH: 0.114,
