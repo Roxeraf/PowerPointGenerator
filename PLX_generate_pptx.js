@@ -111,8 +111,8 @@ function fteColor(val) {
 // Weißer Titel auf Navy-Balken (wie "Agenda Verlauf 1SP" / Bild 2)
 // =========================================================================
 function addFrameNavy(pres, slide, title, pageNum) {
-  // Hellblauer Hintergrund
-  slide.background = { color: CI.bgLight };
+  // Weißer Hintergrund (Header-Bereich bleibt weiß für CI-konformes Logo)
+  slide.background = { color: CI.white };
 
   // 1. Hellblauer Content-Bereich (endet vor Footer-Gradient)
   slide.addShape(pres.shapes.RECTANGLE, {
@@ -131,7 +131,7 @@ function addFrameNavy(pres, slide, title, pageNum) {
     fill: { color: CI.navy }, line: { color: CI.navy, width: 0 }
   });
 
-  // 3. Logo direkt auf hellblauem Hintergrund (kein weißer Kasten)
+  // 3. Logo auf weißem Hintergrund (CI-konform)
   slide.addImage({ data: LOGO_B64, x: L.logoX, y: L.logoY, w: L.logoW, h: L.logoH });
 
   // 4. Titel: WEISS auf Navy
@@ -455,8 +455,8 @@ projekte.forEach((proj, idx) => {
     // === Folie A: Gantt-Diagramm ===
     const slideA = pres.addSlide();
     addFrameNavy(pres, slideA, proj.name || `Projekt ${idx+1}`, pageCounter++);
-    const availH_gantt = L.footerY - ganttY - 0.18;
-    const rowH_A       = Math.min(0.45, Math.max(0.18, availH_gantt / ganttNRows));
+    const availH_gantt = L.footerY - ganttY - 0.30;
+    const rowH_A       = Math.min(0.45, Math.max(0.13, availH_gantt / ganttNRows));
     const fontSize_A   = rowH_A >= 0.22 ? 8 : 7;
     renderGantt(slideA, rowH_A, fontSize_A, ganttY);
 
