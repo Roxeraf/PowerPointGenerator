@@ -287,7 +287,7 @@ const legendRows = [
   [{ text:"Meilenstein",  options:{fontSize:10}},{text:"?",options:{align:"center",bold:true,color:CI.white,fill:{color:CI.phase["?"].bg},fontSize:10}},{text:"",options:{fill:{color:CI.phase["?"].bg}}}],
 ];
 slideL.addTable(legendRows, {
-  x: 0.35, y: LY, w: 4.5, colW:[1.9,0.8,1.8],
+  x: 0.35, y: LY, w: 4.5, h: legendRows.length * 0.36, colW:[1.9,0.8,1.8],
   border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", color:CI.text,
   fill:{color:CI.white}, rowH: 0.36
 });
@@ -303,7 +303,7 @@ const hR = [
   [{text:"0 / leer",    options:{fill:{color:"F0F4FA"},color:"9AAABB",fontSize:10}}],
 ];
 slideL.addTable(hR, {
-  x:5.3, y:LY+0.38, w:3.8,
+  x:5.3, y:LY+0.38, w:3.8, h: hR.length * 0.33,
   border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", rowH:0.33
 });
 
@@ -381,7 +381,7 @@ projekte.forEach((proj, idx) => {
     });
 
     targetSlide.addTable(ganttRows, {
-      x: tX, y: startY, w: tW, colW,
+      x: tX, y: startY, w: tW, h: ganttRows.length * rH, colW,
       rowH: rH,
       border: { pt: 0, color: "FFFFFF" },
       fontFace: "Calibri", color: CI.text,
@@ -443,7 +443,7 @@ projekte.forEach((proj, idx) => {
     fteTableRows.push(sumRow);
 
     targetSlide.addTable(fteTableRows, {
-      x: tX, y: startY, w: tW, colW,
+      x: tX, y: startY, w: tW, h: fteTableRows.length * rH, colW,
       rowH: rH,
       border:{ pt:0.3, color:"D0D8E4" },
       fontFace:"Calibri", color:CI.text,
@@ -528,7 +528,7 @@ MONATE.forEach(m => {
 gesamtRows.push(sumG);
 
 slideG.addTable(gesamtRows, {
-  x: tX2, y: L.contentY, w: tW2, colW: colW2, rowH: rowH2,
+  x: tX2, y: L.contentY, w: tW2, h: gesamtRows.length * rowH2, colW: colW2, rowH: rowH2,
   border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", color:CI.text,
   fill:{color:CI.white}
 });
