@@ -239,6 +239,7 @@ Private Sub KonfigFeld(ws As Worksheet, r As Long, label As String, defaultVal A
         .Font.Color = RGB(40, 60, 90)
     End With
     With ws.Cells(r, 3)
+        .NumberFormat = "@"
         .Value = defaultVal
         .Interior.Color = RGB(255, 255, 255)
         .Borders(xlEdgeBottom).LineStyle = xlContinuous
