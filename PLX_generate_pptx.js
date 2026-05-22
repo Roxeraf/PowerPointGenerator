@@ -542,13 +542,13 @@ MONATE.forEach(m => {
   const val = Math.round(sums[m]*10)/10;
   const c = fteColor(val);
   sumG.push({ text: val>0?String(val):"0",
-    options:{ fill:{color:CI.navy}, color:CI.white, align:"center", valign:"middle", bold:true, fontSize:9 }});
+    options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:true, fontSize:9 }});
 });
 gesamtRows.push(sumG);
 
 slideG.addTable(gesamtRows, {
   x: tX2, y: L.contentY, w: tW2, h: gesamtRows.length * rowH2, colW: colW2, rowH: rowH2,
-  border:{pt:0,color:"FFFFFF"}, fontFace:"Calibri", color:CI.text,
+  border:{pt:0.3,color:"D0D8E4"}, fontFace:"Calibri", color:CI.text,
   fill:{color:CI.white}
 });
 
