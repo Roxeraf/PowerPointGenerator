@@ -437,28 +437,28 @@ projekte.forEach((proj, idx) => {
       fontSize: 8, fontFace: "Calibri", bold: true, color: "7888A0", margin: 0
     });
 
-    const fteHeader = [{ text:"", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize:rFontSize }}];
-    MONATE.forEach(m => fteHeader.push({ text:m, options:{ fill:{color:CI.navy}, color:CI.white, bold:true, align:"center", fontSize:rFontSize }}));
+    const fteHeader = [{ text:"", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize:rFontSize, valign:"middle" }}];
+    MONATE.forEach(m => fteHeader.push({ text:m, options:{ fill:{color:CI.navy}, color:CI.white, bold:true, align:"center", valign:"middle", fontSize:rFontSize }}));
 
     const fteTableRows = [fteHeader];
     renderTPs.forEach(tp => {
       const tpFte = tp.fte || {};
-      const row = [{ text: tp.name || "", options:{ color:CI.text, fontSize:rFontSize, align:"left" }}];
+      const row = [{ text: tp.name || "", options:{ color:CI.text, fontSize:rFontSize, align:"left", valign:"middle" }}];
       MONATE.forEach(m => {
         const val = tpFte[m] || 0;
         const c = fteColor(val);
-        row.push({ text: val > 0 ? String(val) : "", options:{ fill:{color:c.bg}, color:c.text, align:"center", bold:val>=1.5, fontSize:rFontSize }});
+        row.push({ text: val > 0 ? String(val) : "", options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:val>=1.5, fontSize:rFontSize }});
       });
       fteTableRows.push(row);
     });
 
     const fteSumme = proj.fteSumme || (useLegacy ? proj.fte || {} : {});
-    const sumRow = [{ text:"SUMME", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize:rFontSize }}];
+    const sumRow = [{ text:"SUMME", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize:rFontSize, valign:"middle" }}];
     MONATE.forEach(m => {
       const val = fteSumme[m] || 0;
       const c = fteColor(val);
       sumRow.push({ text: val > 0 ? String(val) : "0",
-        options:{ fill:{color:val>0?c.bg:CI.navy}, color:val>0?c.text:CI.white, align:"center", bold:true, fontSize:rFontSize }});
+        options:{ fill:{color:val>0?c.bg:CI.navy}, color:val>0?c.text:CI.white, align:"center", valign:"middle", bold:true, fontSize:rFontSize }});
     });
     fteTableRows.push(sumRow);
 
@@ -516,9 +516,9 @@ const colW2 = [lbW2, ...Array(MONATE.length).fill(mW2)];
 const availH = L.footerY - L.contentY - 0.1;
 const rowH2  = Math.min(0.38, availH / (projekte.length + 2));
 
-const gHeader2 = [{ text:"Projekt", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:9}}];
+const gHeader2 = [{ text:"Projekt", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:9,valign:"middle"}}];
 MONATE.forEach(m => gHeader2.push({
-  text:m, options:{fill:{color:CI.navy},color:CI.white,bold:true,align:"center",fontSize:8}
+  text:m, options:{fill:{color:CI.navy},color:CI.white,bold:true,align:"center",valign:"middle",fontSize:8}
 }));
 
 const gesamtRows = [gHeader2];
@@ -526,23 +526,23 @@ const sums = {};
 MONATE.forEach(m => sums[m] = 0);
 
 projekte.forEach(proj => {
-  const row = [{ text:proj.name, options:{color:CI.text,fontSize:9}}];
+  const row = [{ text:proj.name, options:{color:CI.text,fontSize:9,valign:"middle"}}];
   MONATE.forEach(m => {
     const val = (proj.fteSumme||proj.fte||{})[m] || 0;
     sums[m] += val;
     const c = fteColor(val);
     row.push({ text: val>0?String(val):"",
-      options:{ fill:{color:c.bg}, color:c.text, align:"center", bold:val>=1.5, fontSize:9 }});
+      options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:val>=1.5, fontSize:9 }});
   });
   gesamtRows.push(row);
 });
 
-const sumG = [{ text:"GESAMT", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:9}}];
+const sumG = [{ text:"GESAMT", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:9,valign:"middle"}}];
 MONATE.forEach(m => {
   const val = Math.round(sums[m]*10)/10;
   const c = fteColor(val);
   sumG.push({ text: val>0?String(val):"0",
-    options:{ fill:{color:CI.navy}, color:CI.white, align:"center", bold:true, fontSize:9 }});
+    options:{ fill:{color:CI.navy}, color:CI.white, align:"center", valign:"middle", bold:true, fontSize:9 }});
 });
 gesamtRows.push(sumG);
 
