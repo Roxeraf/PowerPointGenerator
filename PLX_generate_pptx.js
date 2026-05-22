@@ -322,11 +322,8 @@ const colW = [lbW, ...Array(MONATE.length).fill(mW)];
 
 let pageCounter = 3;
 projekte.forEach((proj, idx) => {
-  const slide = pres.addSlide();
-  addFrameLight(pres, slide, proj.name || `Projekt ${idx+1}`, pageCounter++);
-
   const tX    = L.contentX;
-  const ganttY = L.contentY;
+  const ganttY = L.navyH + 0.09;
 
   // Aktive TPs (mit Daten); Fallback auf altes JSON-Format ohne teilprojekte
   const allTPs = proj.teilprojekte || [];
@@ -338,125 +335,166 @@ projekte.forEach((proj, idx) => {
     ? [{ name: proj.name || "Gesamt", phasen: proj.phasen || {}, fte: proj.fte || {} }]
     : activeTPs;
 
-  // Nur Phasen zeigen, die tatsächlich Daten haben (befüllte Zeilen)
+  const nTPs = renderTPs.length;
+
+  // Nur befüllte Phasen pro TP ermitteln
   const tpActivePhases = renderTPs.map(tp =>
     phasenOrder.filter(ph => MONATE.some(m => (tp.phasen || {})[m] === ph))
   );
 
-  const nTPs = renderTPs.length;
-  // Gantt-Zeilen: Kopfzeile + pro TP: 1 Header-Zeile + nur aktive Phase-Zeilen
-  const ganttNRows = 1 + tpActivePhases.reduce((s, phases, i) =>
-    s + (phases.length > 0 ? 1 + phases.length : 0), 0
-  );
+  // Für Gantt: nur TPs die mindestens eine befüllte Phase haben
+  const ganttTPs = renderTPs
+    .map((tp, i) => ({ tp, phases: tpActivePhases[i], origIdx: i }))
+    .filter(({ phases }) => phases.length > 0);
+
+  // Zeilenanzahl: Kopfzeile + pro Gantt-TP: 1 Header + nur befüllte Phasen-Zeilen
+  const ganttNRows = 1 + ganttTPs.reduce((s, { phases }) => s + 1 + phases.length, 0);
   const fteNRows   = 1 + nTPs + 1;
   const labelGap   = 0.18;
-  const availH     = L.footerY - L.contentY - labelGap - 0.06;
-  const rowH       = Math.min(0.28, Math.max(0.12, availH / (ganttNRows + fteNRows)));
-  const fontSize   = rowH >= 0.20 ? 8 : 7;
 
-  // --- GANTT HEADER ---
-  const gHeader = [
-    { text:"", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize }}
-  ];
-  MONATE.forEach(m => gHeader.push({
-    text: m, options:{ fill:{color:CI.navy}, color:CI.white, bold:true, align:"center", fontSize }
-  }));
+  // Passt alles auf eine Folie? Wenn nicht → Zwei-Folien-Layout
+  const availH_single = L.footerY - ganttY - labelGap - 0.04;
+  const rowH_single   = Math.min(0.38, availH_single / (ganttNRows + fteNRows));
+  const useTwoSlides  = nTPs >= 3 || rowH_single < 0.24;
 
-  // --- GANTT TABELLE: nur TP mit Phasen-Daten, nur befüllte Phasen-Zeilen ---
-  const ganttRows = [gHeader];
-  // pillRowIdx: "tpIdx-ph" → Zeilen-Index in ganttRows (für Pill-Positionierung)
-  const pillRowIdx = new Map();
+  // --- Gantt-Folie rendern: addShape/addText für exakte Y-Positionierung ---
+  const renderGantt = (targetSlide, rH, rFontSize, startY) => {
+    const pillRowYMap = new Map(); // "origIdx-ph" → exakte Y-Position der Zeile
+    const pillPadX = 0.02;
+    let curY = startY;
 
-  renderTPs.forEach((tp, tpIdx) => {
-    const activePhases = tpActivePhases[tpIdx];
-    if (activePhases.length === 0) return; // TP hat keine Gantt-Daten → überspringen
-    const tpHdrRow = [{
-      text: tp.name || `Teilprojekt ${tpIdx+1}`,
-      options:{ fill:{color:"D4DEEC"}, color:CI.navy, bold:true, fontSize, align:"left" }
-    }];
-    MONATE.forEach(() => tpHdrRow.push({ text:"", options:{ fill:{color:"D4DEEC"} }}));
-    ganttRows.push(tpHdrRow);
-    activePhases.forEach(ph => {
-      pillRowIdx.set(`${tpIdx}-${ph}`, ganttRows.length);
-      const row = [{
-        text: "  " + (CI.phase[ph]?.label || ph),
-        options:{ color:CI.text, fontSize, align:"left" }
-      }];
-      MONATE.forEach(() => row.push({ text:"", options:{ fill:{color:CI.white} }}));
-      ganttRows.push(row);
+    // Monats-Kopfzeile (Navy)
+    targetSlide.addShape(pres.shapes.RECTANGLE, {
+      x: tX, y: curY, w: tW, h: rH,
+      fill: { color: CI.navy }, line: { color: CI.navy, width: 0 }
     });
-  });
-
-  slide.addTable(ganttRows, {
-    x: tX, y: ganttY, w: tW, colW,
-    rowH,
-    border: { pt: 0.3, color: "D0D8E4" },
-    fontFace: "Calibri", color: CI.text,
-    fill: { color: CI.white }
-  });
-
-  // --- PILL-SHAPES: Position aus pillRowIdx (exakter Zeilen-Index) ---
-  const pillPadX = 0.02;
-  renderTPs.forEach((tp, tpIdx) => {
     MONATE.forEach((m, mIdx) => {
-      const key = (tp.phasen || {})[m];
-      if (!key || !CI.phase[key]) return;
-      const rowIdx = pillRowIdx.get(`${tpIdx}-${key}`);
-      if (rowIdx === undefined) return;
-      const pillH    = rowH * 0.68;
-      const pillOffY = (rowH - pillH) / 2;
-      slide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-        x: tX + lbW + mIdx * mW + pillPadX,
-        y: ganttY + rowIdx * rowH + pillOffY,
-        w: mW - 2 * pillPadX,
-        h: pillH,
-        fill: { color: CI.phase[key].bg },
-        line: { color: CI.phase[key].bg, width: 0 },
-        rectRadius: pillH / 2
+      targetSlide.addText(m, {
+        x: tX + lbW + mIdx * mW, y: curY, w: mW, h: rH,
+        color: CI.white, fontSize: rFontSize, fontFace: "Calibri", bold: true,
+        align: "center", valign: "middle", margin: 0
       });
     });
-  });
+    curY += rH;
 
-  // --- FTE LABEL ---
-  const fteY = ganttY + ganttNRows * rowH + labelGap;
-  slide.addText("Kapazitätsplanung (FTE)", {
-    x: tX, y: fteY - labelGap, w: 4, h: labelGap,
-    fontSize: 8, fontFace: "Calibri", bold: true, color: "7888A0", margin: 0
-  });
+    // TP-Gruppen (nur TPs mit Phasen-Daten, nur befüllte Phasen)
+    ganttTPs.forEach(({ tp, phases, origIdx }) => {
+      targetSlide.addShape(pres.shapes.RECTANGLE, {
+        x: tX, y: curY, w: tW, h: rH,
+        fill: { color: "D4DEEC" }, line: { color: "D4DEEC", width: 0 }
+      });
+      targetSlide.addText(tp.name || `Teilprojekt ${origIdx + 1}`, {
+        x: tX + 0.06, y: curY, w: lbW - 0.06, h: rH,
+        color: CI.navy, fontSize: rFontSize, fontFace: "Calibri", bold: true,
+        valign: "middle", margin: 0
+      });
+      curY += rH;
 
-  // --- FTE TABELLE: alle aktiven TPs ---
-  const fteHeader = [{ text:"", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize }}];
-  MONATE.forEach(m => fteHeader.push({ text:m, options:{ fill:{color:CI.navy}, color:CI.white, bold:true, align:"center", fontSize }}));
-
-  const fteTableRows = [fteHeader];
-  renderTPs.forEach(tp => {
-    const tpFte = tp.fte || {};
-    const row = [{ text: tp.name || "", options:{ color:CI.text, fontSize, align:"left" }}];
-    MONATE.forEach(m => {
-      const val = tpFte[m] || 0;
-      const c = fteColor(val);
-      row.push({ text: val > 0 ? String(val) : "", options:{ fill:{color:c.bg}, color:c.text, align:"center", bold:val>=1.5, fontSize }});
+      phases.forEach(ph => {
+        targetSlide.addShape(pres.shapes.RECTANGLE, {
+          x: tX, y: curY, w: tW, h: rH,
+          fill: { color: CI.white }, line: { color: CI.white, width: 0 }
+        });
+        targetSlide.addText("  " + (CI.phase[ph]?.label || ph), {
+          x: tX, y: curY, w: lbW, h: rH,
+          color: CI.text, fontSize: rFontSize, fontFace: "Calibri",
+          valign: "middle", margin: 0
+        });
+        pillRowYMap.set(`${origIdx}-${ph}`, curY);
+        curY += rH;
+      });
     });
-    fteTableRows.push(row);
-  });
 
-  const fteSumme = proj.fteSumme || (useLegacy ? proj.fte || {} : {});
-  const sumRow = [{ text:"SUMME", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize }}];
-  MONATE.forEach(m => {
-    const val = fteSumme[m] || 0;
-    const c = fteColor(val);
-    sumRow.push({ text: val > 0 ? String(val) : "0",
-      options:{ fill:{color:val>0?c.bg:CI.navy}, color:val>0?c.text:CI.white, align:"center", bold:true, fontSize }});
-  });
-  fteTableRows.push(sumRow);
+    // Pills: Y direkt aus pillRowYMap – nie separat berechnet
+    renderTPs.forEach((tp, tpIdx) => {
+      MONATE.forEach((m, mIdx) => {
+        const key = (tp.phasen || {})[m];
+        if (!key || !CI.phase[key]) return;
+        const rowY = pillRowYMap.get(`${tpIdx}-${key}`);
+        if (rowY === undefined) return;
+        const pillH    = rH * 0.68;
+        const pillOffY = (rH - pillH) / 2;
+        targetSlide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
+          x: tX + lbW + mIdx * mW + pillPadX,
+          y: rowY + pillOffY,
+          w: mW - 2 * pillPadX,
+          h: pillH,
+          fill: { color: CI.phase[key].bg },
+          line: { color: CI.phase[key].bg, width: 0 },
+          rectRadius: pillH / 2
+        });
+      });
+    });
+  };
 
-  slide.addTable(fteTableRows, {
-    x: tX, y: fteY, w: tW, colW,
-    rowH,
-    border:{ pt:0.3, color:"D0D8E4" },
-    fontFace:"Calibri", color:CI.text,
-    fill:{ color:CI.white }
-  });
+  // --- FTE-Folie rendern ---
+  const renderFte = (targetSlide, rH, rFontSize, startY) => {
+    targetSlide.addText("Kapazitätsplanung (FTE)", {
+      x: tX, y: startY - labelGap, w: 4, h: labelGap,
+      fontSize: 8, fontFace: "Calibri", bold: true, color: "7888A0", margin: 0
+    });
+
+    const fteHeader = [{ text:"", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize:rFontSize }}];
+    MONATE.forEach(m => fteHeader.push({ text:m, options:{ fill:{color:CI.navy}, color:CI.white, bold:true, align:"center", fontSize:rFontSize }}));
+
+    const fteTableRows = [fteHeader];
+    renderTPs.forEach(tp => {
+      const tpFte = tp.fte || {};
+      const row = [{ text: tp.name || "", options:{ color:CI.text, fontSize:rFontSize, align:"left" }}];
+      MONATE.forEach(m => {
+        const val = tpFte[m] || 0;
+        const c = fteColor(val);
+        row.push({ text: val > 0 ? String(val) : "", options:{ fill:{color:c.bg}, color:c.text, align:"center", bold:val>=1.5, fontSize:rFontSize }});
+      });
+      fteTableRows.push(row);
+    });
+
+    const fteSumme = proj.fteSumme || (useLegacy ? proj.fte || {} : {});
+    const sumRow = [{ text:"SUMME", options:{ fill:{color:CI.navy}, color:CI.white, bold:true, fontSize:rFontSize }}];
+    MONATE.forEach(m => {
+      const val = fteSumme[m] || 0;
+      const c = fteColor(val);
+      sumRow.push({ text: val > 0 ? String(val) : "0",
+        options:{ fill:{color:val>0?c.bg:CI.navy}, color:val>0?c.text:CI.white, align:"center", bold:true, fontSize:rFontSize }});
+    });
+    fteTableRows.push(sumRow);
+
+    targetSlide.addTable(fteTableRows, {
+      x: tX, y: startY, w: tW, h: fteTableRows.length * rH, colW,
+      rowH: rH,
+      border:{ pt:0.3, color:"D0D8E4" },
+      fontFace:"Calibri", color:CI.text,
+      fill:{ color:CI.white }
+    });
+  };
+
+  if (useTwoSlides) {
+    // === Folie A: Gantt ===
+    const slideA = pres.addSlide();
+    addFrameLight(pres, slideA, proj.name || `Projekt ${idx+1}`, pageCounter++);
+    const availH_gantt = L.footerY - ganttY - 0.04;
+    const rowH_A       = Math.min(0.40, availH_gantt / ganttNRows);
+    const fontSize_A   = rowH_A >= 0.22 ? 8 : 7;
+    renderGantt(slideA, rowH_A, fontSize_A, ganttY);
+
+    // === Folie B: Kapazitätsplanung (FTE) ===
+    const slideB = pres.addSlide();
+    addFrameLight(pres, slideB, (proj.name || `Projekt ${idx+1}`) + " – Kapazitätsplanung", pageCounter++);
+    const availH_fte = L.footerY - ganttY - labelGap - 0.06;
+    const rowH_B     = Math.min(0.70, Math.max(0.25, availH_fte / fteNRows));
+    const fontSize_B = rowH_B >= 0.45 ? 10 : rowH_B >= 0.22 ? 8 : 7;
+    renderFte(slideB, rowH_B, fontSize_B, ganttY + labelGap);
+
+  } else {
+    // === Einzelfolie: Gantt + FTE ===
+    const slide = pres.addSlide();
+    addFrameLight(pres, slide, proj.name || `Projekt ${idx+1}`, pageCounter++);
+    const rowH    = rowH_single;
+    const fontSize = rowH >= 0.20 ? 8 : 7;
+    renderGantt(slide, rowH, fontSize, ganttY);
+    const fteY = ganttY + ganttNRows * rowH + labelGap;
+    renderFte(slide, rowH, fontSize, fteY);
+  }
 });
 
 // =========================================================================
