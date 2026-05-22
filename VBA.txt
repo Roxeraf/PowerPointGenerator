@@ -412,14 +412,12 @@ Sub Exportiere_Als_JSON_Und_PPTX()
                 Next col
                 tpFteJson = tpFteJson & "}"
 
-                If tpPhasenJson <> "{}" Or tpFteJson <> "{}" Then
-                    If Not firstTP Then tpArrayJson = tpArrayJson & ","
-                    tpArrayJson = tpArrayJson & _
-                        "{""name"":""" & EscapeJson(tpName) & """," & _
-                        """phasen"":" & tpPhasenJson & "," & _
-                        """fte"":" & tpFteJson & "}"
-                    firstTP = False
-                End If
+                If Not firstTP Then tpArrayJson = tpArrayJson & ","
+                tpArrayJson = tpArrayJson & _
+                    "{""name"":""" & EscapeJson(tpName) & """," & _
+                    """phasen"":" & tpPhasenJson & "," & _
+                    """fte"":" & tpFteJson & "}"
+                firstTP = False
             Next tp
             tpArrayJson = tpArrayJson & "]"
 
