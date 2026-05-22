@@ -369,25 +369,40 @@ Sub Exportiere_Als_JSON_Und_PPTX()
                 If Len(tpName) = 0 Then tpName = "Teilprojekt " & (tp + 1)
 
                 ' --- Phasen ---
-                ' FIX: Jede Phasenzeile wird nur auf ihr eigenes Kuerzel geprueft.
-                '      Kein Exit For: spaetere Zeilen koennen fruehere ueberschreiben.
-                '      Dadurch werden z.B. Konfiguration-/Test-Zeilen nicht von einer
-                '      gefuellten Pflichtenheft-Zeile blockiert.
+                ' Jede Phasenzeile wird nur auf ihr eigenes Kuerzel geprueft.
+                ' Wenn mehrere Phasen in derselben Monatsspalte befuellt sind,
+                ' werden alle als JSON-Array exportiert (z.B. ["p","k","t","g"]).
+                ' Bei nur einer Phase bleibt das Format rueckwaertskompatibel (String).
                 tpPhasenJson = "{"
                 firstTpPhase = True
+                Dim colPhases(4) As String
+                Dim colPhaseCount As Integer
+                Dim ai As Integer
+                Dim arrStr As String
                 For col = 2 To lastCol
-                    tpKuerzel = ""
+                    colPhaseCount = 0
                     For phIdx = 0 To 4
                         If Trim(CStr(wsProj.Cells(CLng(tpStartRows(tp)) + phIdx, col).Value)) = phaseKuerzel(phIdx) Then
-                            tpKuerzel = phaseKuerzel(phIdx)
-                            ' Kein Exit For: spaetere Phasen (z.B. GoLive) ueberschreiben fruehre
+                            colPhases(colPhaseCount) = phaseKuerzel(phIdx)
+                            colPhaseCount = colPhaseCount + 1
                         End If
                     Next phIdx
-                    If Len(tpKuerzel) > 0 Then
+                    If colPhaseCount = 1 Then
                         If Not firstTpPhase Then tpPhasenJson = tpPhasenJson & ","
                         tpPhasenJson = tpPhasenJson & _
                             """" & EscapeJson(CStr(monate(CLng(col - 2)))) & """:" & _
-                            """" & tpKuerzel & """"
+                            """" & colPhases(0) & """"
+                        firstTpPhase = False
+                    ElseIf colPhaseCount > 1 Then
+                        If Not firstTpPhase Then tpPhasenJson = tpPhasenJson & ","
+                        arrStr = "["
+                        For ai = 0 To colPhaseCount - 1
+                            If ai > 0 Then arrStr = arrStr & ","
+                            arrStr = arrStr & """" & colPhases(ai) & """"
+                        Next ai
+                        arrStr = arrStr & "]"
+                        tpPhasenJson = tpPhasenJson & _
+                            """" & EscapeJson(CStr(monate(CLng(col - 2)))) & """:" & arrStr
                         firstTpPhase = False
                     End If
                 Next col

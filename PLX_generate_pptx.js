@@ -408,20 +408,23 @@ projekte.forEach((proj, idx) => {
     // Pills: Y direkt aus pillRowYMap – nie separat berechnet
     renderTPs.forEach((tp, tpIdx) => {
       MONATE.forEach((m, mIdx) => {
-        const key = (tp.phasen || {})[m];
-        if (!key || !CI.phase[key]) return;
-        const rowY = pillRowYMap.get(`${tpIdx}-${key}`);
-        if (rowY === undefined) return;
-        const pillH    = rH * 0.68;
-        const pillOffY = (rH - pillH) / 2;
-        targetSlide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-          x: tX + lbW + mIdx * mW + pillPadX,
-          y: rowY + pillOffY,
-          w: mW - 2 * pillPadX,
-          h: pillH,
-          fill: { color: CI.phase[key].bg },
-          line: { color: CI.phase[key].bg, width: 0 },
-          rectRadius: pillH / 2
+        const phasenVal = (tp.phasen || {})[m];
+        const keys = Array.isArray(phasenVal) ? phasenVal : (phasenVal ? [phasenVal] : []);
+        keys.forEach(key => {
+          if (!CI.phase[key]) return;
+          const rowY = pillRowYMap.get(`${tpIdx}-${key}`);
+          if (rowY === undefined) return;
+          const pillH    = rH * 0.68;
+          const pillOffY = (rH - pillH) / 2;
+          targetSlide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
+            x: tX + lbW + mIdx * mW + pillPadX,
+            y: rowY + pillOffY,
+            w: mW - 2 * pillPadX,
+            h: pillH,
+            fill: { color: CI.phase[key].bg },
+            line: { color: CI.phase[key].bg, width: 0 },
+            rectRadius: pillH / 2
+          });
         });
       });
     });
