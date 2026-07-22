@@ -502,54 +502,85 @@ projekte.forEach((proj, idx) => {
 
 // =========================================================================
 // GESAMTÜBERSICHT
+// Skaliert Zeilenhöhe UND Schriftgröße dynamisch und verteilt sich bei
+// vielen Projekten (z.B. > 12-15) automatisch auf mehrere Folien, damit
+// die FTE-Zusammenfassung immer lesbar bleibt statt gestaucht zu werden.
 // =========================================================================
-const slideG = pres.addSlide();
-addFrameLight(pres, slideG, "Kapazitätsübersicht – Gesamt", pageCounter++);
-
 const tX2  = L.contentX;
 const tW2  = L.contentW;
 const lbW2 = 1.4;
 const mW2  = (tW2 - lbW2) / MONATE.length;
 const colW2 = [lbW2, ...Array(MONATE.length).fill(mW2)];
 
-// Dynamische Zeilenhöhe
-const availH = L.footerY - L.contentY - 0.1;
-const rowH2  = Math.min(0.38, availH / (projekte.length + 2));
+const availH   = L.footerY - L.contentY - 0.1;
+const MIN_ROWH2  = 0.22;   // kleinste noch lesbare Zeilenhöhe
+const MIN_FONT2  = 7;      // kleinste noch lesbare Schriftgröße
 
-const gHeader2 = [{ text:"Projekt", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:9,valign:"middle"}}];
-MONATE.forEach(m => gHeader2.push({
-  text:m, options:{fill:{color:CI.navy},color:CI.white,bold:true,align:"center",valign:"middle",fontSize:8}
-}));
-
-const gesamtRows = [gHeader2];
+// Portfolio-Summe je Monat (über ALLE Projekte, unabhängig von der Seitenaufteilung)
 const sums = {};
 MONATE.forEach(m => sums[m] = 0);
-
 projekte.forEach(proj => {
-  const row = [{ text:proj.name, options:{color:CI.text,fontSize:9,valign:"middle"}}];
-  MONATE.forEach(m => {
-    const val = (proj.fteSumme||proj.fte||{})[m] || 0;
-    sums[m] += val;
-    const c = fteColor(val);
-    row.push({ text: val>0?String(val):"",
-      options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:val>=1.5, fontSize:9 }});
+  MONATE.forEach(m => { sums[m] += (proj.fteSumme || proj.fte || {})[m] || 0; });
+});
+
+// Wie viele Projekt-Zeilen passen pro Folie? (abzüglich Kopfzeile + Summenzeile
+// auf der letzten Folie, damit auch diese garantiert noch in availH passt)
+const maxRowsPerSlide = Math.max(1, Math.floor(availH / MIN_ROWH2) - 2);
+
+const gesamtPages = [];
+if (projekte.length === 0) {
+  gesamtPages.push([]);
+} else {
+  for (let i = 0; i < projekte.length; i += maxRowsPerSlide) {
+    gesamtPages.push(projekte.slice(i, i + maxRowsPerSlide));
+  }
+}
+
+gesamtPages.forEach((pageProjekte, pageIdx) => {
+  const isLastPage = pageIdx === gesamtPages.length - 1;
+  const slideG = pres.addSlide();
+  const titleG = gesamtPages.length > 1
+    ? `Kapazitätsübersicht – Gesamt (${pageIdx + 1}/${gesamtPages.length})`
+    : "Kapazitätsübersicht – Gesamt";
+  addFrameLight(pres, slideG, titleG, pageCounter++);
+
+  const rowsOnSlide = pageProjekte.length + 1 + (isLastPage ? 1 : 0); // Header (+ Summe)
+  const rowH2    = Math.max(MIN_ROWH2, Math.min(0.38, availH / rowsOnSlide));
+  const fontSize2 = rowH2 >= 0.32 ? 9 : rowH2 >= 0.26 ? 8 : MIN_FONT2;
+
+  const gHeader2 = [{ text:"Projekt", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:fontSize2,valign:"middle"}}];
+  MONATE.forEach(m => gHeader2.push({
+    text:m, options:{fill:{color:CI.navy},color:CI.white,bold:true,align:"center",valign:"middle",fontSize:fontSize2}
+  }));
+
+  const gesamtRows = [gHeader2];
+  pageProjekte.forEach(proj => {
+    const row = [{ text:proj.name, options:{color:CI.text,fontSize:fontSize2,valign:"middle"}}];
+    MONATE.forEach(m => {
+      const val = (proj.fteSumme||proj.fte||{})[m] || 0;
+      const c = fteColor(val);
+      row.push({ text: val>0?String(val):"",
+        options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:val>=1.5, fontSize:fontSize2 }});
+    });
+    gesamtRows.push(row);
   });
-  gesamtRows.push(row);
-});
 
-const sumG = [{ text:"GESAMT", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:9,valign:"middle"}}];
-MONATE.forEach(m => {
-  const val = Math.round(sums[m]*10)/10;
-  const c = fteColor(val);
-  sumG.push({ text: val>0?String(val):"0",
-    options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:true, fontSize:9 }});
-});
-gesamtRows.push(sumG);
+  if (isLastPage) {
+    const sumG = [{ text:"GESAMT", options:{fill:{color:CI.navy},color:CI.white,bold:true,fontSize:fontSize2,valign:"middle"}}];
+    MONATE.forEach(m => {
+      const val = Math.round(sums[m]*10)/10;
+      const c = fteColor(val);
+      sumG.push({ text: val>0?String(val):"0",
+        options:{ fill:{color:c.bg}, color:c.text, align:"center", valign:"middle", bold:true, fontSize:fontSize2 }});
+    });
+    gesamtRows.push(sumG);
+  }
 
-slideG.addTable(gesamtRows, {
-  x: tX2, y: L.contentY, w: tW2, h: gesamtRows.length * rowH2, colW: colW2, rowH: rowH2,
-  border:{pt:0.3,color:"D0D8E4"}, fontFace:"Calibri", color:CI.text,
-  fill:{color:CI.white}
+  slideG.addTable(gesamtRows, {
+    x: tX2, y: L.contentY, w: tW2, h: gesamtRows.length * rowH2, colW: colW2, rowH: rowH2,
+    border:{pt:0.3,color:"D0D8E4"}, fontFace:"Calibri", color:CI.text,
+    fill:{color:CI.white}
+  });
 });
 
 // =========================================================================
