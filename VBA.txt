@@ -1,17 +1,35 @@
 ' =========================================================================
-' PURELOX KAPAZITAETSPLANER v4.1 (Bugfixes: Umbenennung, Gantt-Export, Update)
+' PURELOX KAPAZITAETSPLANER v4.2 (Dynamische Projektanzahl > 12)
 ' BOOST - Customer Solutions Team
 '
 ' WORKFLOW:
 '   1. Makro "Erstelle_Komplettes_Planungs_Tool" ausfuehren (NUR EINMAL ZUM START!)
-'   2. Blatt "Konfiguration" ausfuellen (Titelseite, Zeitraum, Pfade)
+'   2. Blatt "Konfiguration" ausfuellen (Titelseite, Zeitraum, Pfade, Anzahl Projekte)
 '   3. Projektblaetter umbenennen (optional) und mit Gantt-Kuerzeln + FTE befuellen
-'   4. Button "PowerPoint exportieren" klicken
+'   4. Bei Bedarf weitere Projekte per Makro "Neues_Projekt_Hinzufuegen" ergaenzen
+'      (beliebig oft, auch weit ueber 12 Projekte hinaus)
+'   5. Button "PowerPoint exportieren" klicken
 '   WICHTIG: Wenn sich Startmonat / Anzahl aendert, NUR "Aktualisiere_Monatszeile" ausfuehren!
 '
 ' GANTT-KUERZEL (Kuerzel in die jeweilige Phasen-Zeile eintragen):
 '   Pflichtenheft-Zeile: p    Konfiguration-Zeile: k
 '   Test-Zeile:          t    GoLive-Zeile:         g    Meilenstein-Zeile: ?
+'
+' NEU IN v4.2:
+'   - Konfigurationsblatt: Feld "Anzahl Projekte bei Ersteinrichtung" (Row 19),
+'     steuert wie viele Projektblaetter "Erstelle_Komplettes_Planungs_Tool" anlegt
+'   - Neues Makro "Neues_Projekt_Hinzufuegen": dupliziert die Vorlage eines
+'     bestehenden Projektblatts (Struktur/Formatierung bleibt erhalten) und
+'     erweitert die Gesamtuebersicht automatisch - beliebig oft aufrufbar
+'   - Neues Makro "Aktualisiere_Gesamtuebersicht": baut die Gesamtuebersicht
+'     komplett neu aus allen vorhandenen Projektblaettern auf (self-healing
+'     nach manuellem Kopieren/Loeschen/Umbenennen von Blaettern)
+'   - "Exportiere_Als_JSON_Und_PPTX" und "Aktualisiere_Monatszeile" rufen die
+'     Gesamtuebersicht-Aktualisierung automatisch mit auf
+'   - PLX_generate_pptx.js: Die Gesamtuebersicht-Folie skaliert Zeilenhoehe UND
+'     Schriftgroesse dynamisch und teilt sich bei vielen Projekten automatisch
+'     auf mehrere Folien auf (Pagination), damit die FTE-Zusammenfassung auch
+'     bei > 12 Projekten sauber lesbar bleibt
 '
 ' BUGFIXES v4.1:
 '   - Umbenannte Projektblaetter werden erkannt (kein Hardcode "Projekt XX" mehr)
@@ -38,7 +56,8 @@ Sub Erstelle_Komplettes_Planungs_Tool()
            "Naechste Schritte:" & vbNewLine & _
            "1. Blatt 'Konfiguration' ausfuellen" & vbNewLine & _
            "2. Projektblaetter umbenennen (optional) und befuellen" & vbNewLine & _
-           "3. 'PowerPoint exportieren' klicken", _
+           "3. Bei Bedarf weitere Projekte per Makro 'Neues_Projekt_Hinzufuegen' ergaenzen" & vbNewLine & _
+           "4. 'PowerPoint exportieren' klicken", _
            vbInformation, "PureLoX Kapazitaetsplaner"
 End Sub
 
@@ -88,6 +107,26 @@ Private Function Lese_Monate(wb As Workbook) As Variant
     If anzahl < 1 Or anzahl > 24 Then anzahl = 14
 
     Lese_Monate = Berechne_Monate(startStr, anzahl)
+End Function
+
+' Liest Anzahl Startprojekte (Row 19, Spalte C) aus Konfiguration.
+' Steuert nur, wie viele Projektblaetter "Erstelle_Komplettes_Planungs_Tool"
+' beim Ersteinrichten anlegt. Weitere Projekte koennen danach jederzeit per
+' "Neues_Projekt_Hinzufuegen" ergaenzt werden - dort gibt es keine Obergrenze.
+Private Function Lese_AnzahlProjekte(wb As Workbook) As Long
+    Dim wsK As Worksheet
+    Dim anzahl As Long
+
+    Set wsK = wb.Worksheets("Konfiguration")
+    anzahl = 12
+    On Error Resume Next
+    anzahl = CLng(wsK.Cells(19, 3).Value)
+    On Error GoTo 0
+
+    If anzahl < 1 Then anzahl = 12
+    If anzahl > 60 Then anzahl = 60
+
+    Lese_AnzahlProjekte = anzahl
 End Function
 
 ' =========================================================================
@@ -167,23 +206,27 @@ Sub Erstelle_Konfigurationsblatt(wb As Workbook)
     Call KonfigFeld(ws, startRow, "Pfad zu PLX_generate_pptx.js", "C:\PLX_Tools\PLX_generate_pptx.js")
     startRow = startRow + 2                                                                  ' Row 16
 
-    ' Zeilen 16-18: ZEITRAUM
+    ' Zeilen 16-19: ZEITRAUM
     ' WICHTIG: Lese_Monate() liest Row 17 (Startmonat) und Row 18 (Anzahl), Spalte C
+    '          Lese_AnzahlProjekte() liest Row 19, Spalte C
     Call KonfigLabel(ws, startRow, "PLANUNGSZEITRAUM")
     startRow = startRow + 1                                                                  ' Row 17
     Call KonfigFeld(ws, startRow, "Startmonat (MM.YYYY)", "04.2026")
     startRow = startRow + 1                                                                  ' Row 18
     Call KonfigFeld(ws, startRow, "Anzahl Monate (max. 24)", "14")
-    startRow = startRow + 2                                                                  ' Row 20
+    startRow = startRow + 1                                                                  ' Row 19
+    Call KonfigFeld(ws, startRow, "Anzahl Projekte bei Ersteinrichtung (max. 60)", "12")
+    startRow = startRow + 2                                                                  ' Row 21
 
-    ' Hinweis Row 20
+    ' Hinweis Row 21
     With ws.Cells(startRow, 2)
-        .Value = "Hinweis: Nach Aenderung des Zeitraums Makro 'Aktualisiere_Monatszeile' ausfuehren (erhalt Projektdaten)."
+        .Value = "Hinweis: Nach Aenderung des Zeitraums Makro 'Aktualisiere_Monatszeile' ausfuehren (erhalt Projektdaten). " & _
+                  "Weitere Projekte jederzeit per Makro 'Neues_Projekt_Hinzufuegen' ergaenzen."
         .Font.Italic = True
         .Font.Color = RGB(150, 30, 0)
         .Font.Size = 10
     End With
-    startRow = startRow + 2                                                                  ' Row 22
+    startRow = startRow + 2                                                                  ' Row 23
 
     ' Export-Button Row 22
     ws.Rows(startRow).RowHeight = 38
@@ -308,6 +351,10 @@ Sub Exportiere_Als_JSON_Und_PPTX()
 
     Set wb = ActiveWorkbook
     Set wsKonfig = wb.Worksheets("Konfiguration")
+
+    ' Gesamtuebersicht vor jedem Export neu aufbauen, damit nachtraeglich
+    ' hinzugefuegte/umbenannte/geloeschte Projektblaetter immer korrekt drin stehen
+    Call Baue_Gesamtuebersicht(wb)
 
     headline    = Trim(wsKonfig.Cells(4, 3).Value)
     subheadline = Trim(wsKonfig.Cells(5, 3).Value)
@@ -536,17 +583,16 @@ Sub Erstelle_Planungsblaetter(wb As Workbook)
     Dim anzahlMonate As Integer
     Dim lastCol As Integer
     Dim colLetter As String
-    Dim projektNamen(1 To 12) As String
+    Dim projektNamen() As String
+    Dim anzahlProjekte As Long
     Dim i As Long
     Dim col As Long
     Dim p As Long
     Dim row As Long
     Dim rGantt As Long
     Dim rFTE As Long
-    Dim rowGesamt As Long
     Dim rngGantt As Range
     Dim rngFTE As Range
-    Dim rngGesamt As Range
     Dim bgCI As Long
     Dim r As Long
     Dim wsToDelete As Worksheet
@@ -562,7 +608,10 @@ Sub Erstelle_Planungsblaetter(wb As Workbook)
     lastCol = 1 + anzahlMonate
     colLetter = Split(Cells(1, lastCol).Address, "$")(1)
 
-    For i = 1 To 12
+    ' --- Dynamische Projektanzahl (konfigurierbar, statt fix 12) ---
+    anzahlProjekte = Lese_AnzahlProjekte(wb)
+    ReDim projektNamen(1 To anzahlProjekte)
+    For i = 1 To anzahlProjekte
         projektNamen(i) = "Projekt " & Format(i, "00")
     Next i
 
@@ -658,35 +707,16 @@ Sub Erstelle_Planungsblaetter(wb As Workbook)
     wsLegende.Cells(21, 2).Font.Size = 10
 
     ' --- GESAMTUEBERSICHT ---
+    ' Nur als leeres Blatt an der richtigen Position anlegen; der komplette
+    ' Inhalt (Header, Projektzeilen, Formeln, Gesamtsumme) wird nach Anlage
+    ' aller Projektblaetter zentral von Baue_Gesamtuebersicht() aufgebaut -
+    ' derselbe Code laeuft auch bei "Neues_Projekt_Hinzufuegen" und
+    ' "Aktualisiere_Monatszeile".
     Set wsGesamt = wb.Worksheets.Add(After:=wsLegende)
     wsGesamt.Name = "Gesamtuebersicht"
-    wsGesamt.Cells.Font.Name = "Calibri"
-    wsGesamt.Cells.Font.Size = 11
-    wsGesamt.Cells.Interior.Color = bgCI
-    ActiveWindow.DisplayGridlines = False
 
-    wsGesamt.Cells(1, 1).Value = "Projekt"
-    With wsGesamt.Cells(1, 1)
-        .Font.Bold = True
-        .Font.Color = RGB(255, 255, 255)
-        .Interior.Color = RGB(0, 47, 94)
-    End With
-    For col = 0 To anzahlMonate - 1
-        With wsGesamt.Cells(1, col + 2)
-            .NumberFormat = "@"
-            .Value = monate(col)
-            .Font.Bold = True
-            .Font.Color = RGB(255, 255, 255)
-            .Interior.Color = RGB(0, 47, 94)
-            .HorizontalAlignment = xlCenter
-            .VerticalAlignment = xlCenter
-        End With
-    Next col
-    wsGesamt.Rows(1).RowHeight = 26
-    rowGesamt = 2
-
-    ' --- 12 PROJEKTBLAETTER ---
-    For i = 1 To 12
+    ' --- PROJEKTBLAETTER (Anzahl aus Konfiguration, siehe Lese_AnzahlProjekte) ---
+    For i = 1 To anzahlProjekte
         Set wsProj = wb.Worksheets.Add(After:=wb.Sheets(wb.Sheets.Count))
         wsProj.Name = projektNamen(i)
         wsProj.Cells.Font.Name = "Calibri"
@@ -796,11 +826,7 @@ Sub Erstelle_Planungsblaetter(wb As Workbook)
                 .Interior.Color = RGB(0, 47, 94)
                 .Font.Color = RGB(255, 255, 255)
             End With
-            wsGesamt.Cells(rowGesamt, 1).Value = projektNamen(i) & " (FTE)"
-            wsGesamt.Cells(rowGesamt, col).Formula = _
-                "='" & projektNamen(i) & "'!" & wsProj.Cells(rFTE + 4, col).Address(False, False)
         Next col
-        rowGesamt = rowGesamt + 1
 
         Set rngFTE = wsProj.Range("B24:" & colLetter & "26")
         Call Setze_FTE_Formatierung(rngFTE)
@@ -813,6 +839,92 @@ Sub Erstelle_Planungsblaetter(wb As Workbook)
         wsProj.Columns("B:" & colLetter).ColumnWidth = 9
         Set wsProj = Nothing
     Next i
+
+    ' Gesamtuebersicht (Header + Projektzeilen + GESAMT-Summe) zentral aufbauen
+    Call Baue_Gesamtuebersicht(wb)
+End Sub
+
+' =========================================================================
+' 5b. GESAMTUEBERSICHT DYNAMISCH AUFBAUEN
+'     Liest alle aktuell vorhandenen Projektblaetter (IstProjektBlatt) und
+'     baut die Gesamtuebersicht komplett neu auf. Dadurch bleibt sie immer
+'     synchron - egal ob Projekte hinzugefuegt, umbenannt, geloescht oder
+'     manuell kopiert wurden. Wird von Erstelle_Planungsblaetter,
+'     Neues_Projekt_Hinzufuegen, Aktualisiere_Monatszeile und
+'     Exportiere_Als_JSON_Und_PPTX aufgerufen.
+' =========================================================================
+Private Sub Baue_Gesamtuebersicht(wb As Workbook)
+    Dim wsGesamt As Worksheet
+    Dim wsProj As Worksheet
+    Dim monate As Variant
+    Dim anzahlMonate As Integer
+    Dim lastCol As Integer
+    Dim colLetter As String
+    Dim col As Long
+    Dim rowGesamt As Long
+    Dim projName As String
+    Dim fteSummeZeile As Long
+    Dim rngGesamt As Range
+    Dim bgCI As Long
+    Dim wsAktiv As Worksheet
+
+    bgCI = RGB(236, 242, 248)
+    fteSummeZeile = 27  ' Feste Vorlagen-Struktur: 3 Teilprojekte (Rows 24-26) + Summe (27)
+
+    On Error Resume Next
+    Set wsGesamt = wb.Worksheets("Gesamtuebersicht")
+    On Error GoTo 0
+    If wsGesamt Is Nothing Then
+        Set wsGesamt = wb.Worksheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+        wsGesamt.Name = "Gesamtuebersicht"
+    End If
+
+    monate = Lese_Monate(wb)
+    anzahlMonate = UBound(monate) + 1
+    lastCol = 1 + anzahlMonate
+    colLetter = Split(wsGesamt.Cells(1, lastCol).Address, "$")(1)
+
+    ' Blatt komplett zuruecksetzen (Inhalt + Formatierung + bedingte Formate)
+    wsGesamt.Cells.Clear
+    wsGesamt.Cells.Font.Name = "Calibri"
+    wsGesamt.Cells.Font.Size = 11
+    wsGesamt.Cells.Interior.Color = bgCI
+
+    ' Header-Zeile
+    wsGesamt.Cells(1, 1).Value = "Projekt"
+    With wsGesamt.Cells(1, 1)
+        .Font.Bold = True
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(0, 47, 94)
+    End With
+    For col = 0 To anzahlMonate - 1
+        With wsGesamt.Cells(1, col + 2)
+            .NumberFormat = "@"
+            .Value = monate(col)
+            .Font.Bold = True
+            .Font.Color = RGB(255, 255, 255)
+            .Interior.Color = RGB(0, 47, 94)
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+        End With
+    Next col
+    wsGesamt.Rows(1).RowHeight = 26
+
+    ' Eine Zeile pro aktuell vorhandenem Projektblatt (beliebige Anzahl)
+    rowGesamt = 2
+    For Each wsProj In wb.Worksheets
+        If IstProjektBlatt(wsProj) Then
+            projName = Trim(CStr(wsProj.Cells(1, 1).Value))
+            If Len(projName) = 0 Then projName = wsProj.Name
+
+            wsGesamt.Cells(rowGesamt, 1).Value = projName & " (FTE)"
+            For col = 2 To lastCol
+                wsGesamt.Cells(rowGesamt, col).Formula = _
+                    "='" & wsProj.Name & "'!" & wsProj.Cells(fteSummeZeile, col).Address(False, False)
+            Next col
+            rowGesamt = rowGesamt + 1
+        End If
+    Next wsProj
 
     ' Gesamtsumme
     wsGesamt.Cells(rowGesamt, 1).Value = "GESAMT PORTFOLIO FTE"
@@ -828,14 +940,23 @@ Sub Erstelle_Planungsblaetter(wb As Workbook)
         End With
     Next col
 
-    Set rngGesamt = wsGesamt.Range("B2:" & colLetter & CStr(rowGesamt - 1))
-    Call Setze_FTE_Formatierung(rngGesamt)
+    If rowGesamt >= 3 Then
+        Set rngGesamt = wsGesamt.Range("B2:" & colLetter & CStr(rowGesamt - 1))
+        Call Setze_FTE_Formatierung(rngGesamt)
+        rngGesamt.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        rngGesamt.Borders(xlInsideHorizontal).Color = RGB(210, 215, 225)
+        rngGesamt.Borders(xlInsideVertical).LineStyle = xlContinuous
+        rngGesamt.Borders(xlInsideVertical).Color = RGB(210, 215, 225)
+    End If
+
     wsGesamt.Columns(1).ColumnWidth = 28
     wsGesamt.Columns("B:" & colLetter).ColumnWidth = 9
-    rngGesamt.Borders(xlInsideHorizontal).LineStyle = xlContinuous
-    rngGesamt.Borders(xlInsideHorizontal).Color = RGB(210, 215, 225)
-    rngGesamt.Borders(xlInsideVertical).LineStyle = xlContinuous
-    rngGesamt.Borders(xlInsideVertical).Color = RGB(210, 215, 225)
+
+    ' Gitternetzlinien ausblenden, ohne das aktuell aktive Blatt zu veraendern
+    Set wsAktiv = wb.ActiveSheet
+    wsGesamt.Activate
+    ActiveWindow.DisplayGridlines = False
+    If Not wsAktiv Is Nothing Then wsAktiv.Activate
 End Sub
 
 ' =========================================================================
@@ -892,7 +1013,6 @@ End Sub
 Sub Aktualisiere_Monatszeile()
     Dim wb As Workbook
     Dim wsProj As Worksheet
-    Dim wsGesamt As Worksheet
     Dim monate As Variant
     Dim anzahlMonate As Integer
     Dim lastCol As Integer
@@ -903,30 +1023,6 @@ Sub Aktualisiere_Monatszeile()
     monate = Lese_Monate(wb)
     anzahlMonate = UBound(monate) + 1
     lastCol = 1 + anzahlMonate
-
-    ' --- Gesamtuebersicht: Header-Zeile vollstaendig neu schreiben ---
-    On Error Resume Next
-    Set wsGesamt = wb.Worksheets("Gesamtuebersicht")
-    On Error GoTo 0
-    If Not wsGesamt Is Nothing Then
-        ' Alte Monats-Header loeschen (Spalten 2 bis max. 26, sicherer Puffer)
-        For clearCol = 2 To 26
-            wsGesamt.Cells(1, clearCol).ClearContents
-            wsGesamt.Cells(1, clearCol).Interior.Color = RGB(236, 242, 248)
-        Next clearCol
-        ' Neue Header schreiben
-        For col = 0 To anzahlMonate - 1
-            With wsGesamt.Cells(1, col + 2)
-                .NumberFormat = "@"
-                .Value = monate(col)
-                .Font.Bold = True
-                .Font.Color = RGB(255, 255, 255)
-                .Interior.Color = RGB(0, 47, 94)
-                .HorizontalAlignment = xlCenter
-                .VerticalAlignment = xlCenter
-            End With
-        Next col
-    End If
 
     ' FIX: Alle Projektblaetter iterieren (auch umbenannte)
     For Each wsProj In wb.Worksheets
@@ -964,7 +1060,126 @@ Sub Aktualisiere_Monatszeile()
         End If
     Next wsProj
 
+    ' Gesamtuebersicht komplett neu aufbauen (Header + Projektzeilen + Summe)
+    Call Baue_Gesamtuebersicht(wb)
+
     MsgBox "Monate wurden angepasst - Projektdaten bleiben erhalten!" & vbNewLine & _
            "Startmonat: " & monate(0) & "  |  Anzahl: " & anzahlMonate, _
            vbInformation, "Update erfolgreich"
+End Sub
+
+' =========================================================================
+' 6. WEITERES PROJEKT HINZUFUEGEN (fuer > 12 Projekte)
+'    Dupliziert die Struktur/Formatierung eines bestehenden Projektblatts
+'    (per Sheet-Copy, dadurch bleiben bedingte Formatierung, Formeln und
+'    Spaltenbreiten exakt erhalten) und leert nur die Eingabebereiche.
+'    Kann beliebig oft aufgerufen werden - es gibt keine Obergrenze.
+' =========================================================================
+Sub Neues_Projekt_Hinzufuegen()
+    Dim wb As Workbook
+    Dim wsTemplate As Worksheet
+    Dim wsNeu As Worksheet
+    Dim wsProj As Worksheet
+    Dim anzahlBestehend As Long
+    Dim neuerName As String
+    Dim monate As Variant
+    Dim anzahlMonate As Integer
+    Dim lastCol As Integer
+    Dim colLetter As String
+    Dim n As Long
+
+    Set wb = ActiveWorkbook
+
+    ' Letztes vorhandenes Projektblatt als Vorlage nehmen (garantiert korrekte
+    ' Struktur, bedingte Formatierung und Formeln)
+    anzahlBestehend = 0
+    For Each wsProj In wb.Worksheets
+        If IstProjektBlatt(wsProj) Then
+            Set wsTemplate = wsProj
+            anzahlBestehend = anzahlBestehend + 1
+        End If
+    Next wsProj
+
+    If wsTemplate Is Nothing Then
+        MsgBox "Kein bestehendes Projektblatt gefunden." & vbNewLine & _
+               "Bitte zuerst 'Erstelle_Komplettes_Planungs_Tool' ausfuehren.", _
+               vbExclamation, "Neues Projekt"
+        Exit Sub
+    End If
+
+    ' Naechsten freien Namen "Projekt NN" ermitteln (ueberspringt bereits
+    ' vergebene bzw. umbenannte Blaetter)
+    n = anzahlBestehend + 1
+    neuerName = "Projekt " & Format(n, "00")
+    Do While Blatt_Existiert(wb, neuerName)
+        n = n + 1
+        neuerName = "Projekt " & Format(n, "00")
+    Loop
+
+    wsTemplate.Copy After:=wb.Worksheets(wb.Worksheets.Count)
+    Set wsNeu = wb.Worksheets(wb.Worksheets.Count)
+    wsNeu.Name = neuerName
+
+    monate = Lese_Monate(wb)
+    anzahlMonate = UBound(monate) + 1
+    lastCol = 1 + anzahlMonate
+    colLetter = Split(wsNeu.Cells(1, lastCol).Address, "$")(1)
+
+    ' Titelzeile auf den neuen Namen setzen
+    With wsNeu.Range("A1")
+        .Value = neuerName
+    End With
+
+    ' Eingabebereiche leeren (Gantt-Kuerzel + FTE-Werte); Formeln, Formatierung
+    ' und bedingte Formatierung der Vorlage bleiben unveraendert erhalten
+    wsNeu.Range("B4:" & colLetter & "21").ClearContents
+    wsNeu.Range("B24:" & colLetter & "26").ClearContents
+
+    ' Teilprojekt-Namen und Summenzeile zuruecksetzen
+    wsNeu.Cells(4, 1).Value = "Teilprojekt 1"
+    wsNeu.Cells(10, 1).Value = "Teilprojekt 2"
+    wsNeu.Cells(16, 1).Value = "Teilprojekt 3"
+    wsNeu.Cells(24, 1).Value = "Teilprojekt 1"
+    wsNeu.Cells(25, 1).Value = "Teilprojekt 2"
+    wsNeu.Cells(26, 1).Value = "Teilprojekt 3"
+    wsNeu.Cells(27, 1).Value = "SUMME " & UCase(neuerName)
+
+    ' Gesamtuebersicht um das neue Projekt erweitern
+    Call Baue_Gesamtuebersicht(wb)
+
+    wsNeu.Activate
+    MsgBox "Neues Projektblatt '" & neuerName & "' wurde erstellt." & vbNewLine & _
+           "Die Gesamtuebersicht wurde automatisch ergaenzt." & vbNewLine & vbNewLine & _
+           "Du kannst das Blatt jederzeit umbenennen und mit Gantt-Kuerzeln / FTE befuellen.", _
+           vbInformation, "Projekt hinzugefuegt"
+End Sub
+
+Private Function Blatt_Existiert(wb As Workbook, name As String) As Boolean
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = wb.Worksheets(name)
+    On Error GoTo 0
+    Blatt_Existiert = Not (ws Is Nothing)
+End Function
+
+' =========================================================================
+' 7. GESAMTUEBERSICHT MANUELL AKTUALISIEREN
+'    Fuer den Fall, dass Projektblaetter manuell kopiert, umbenannt oder
+'    geloescht wurden, ohne "Neues_Projekt_Hinzufuegen" zu benutzen.
+' =========================================================================
+Sub Aktualisiere_Gesamtuebersicht()
+    Dim wb As Workbook
+    Dim anzahl As Long
+    Dim ws As Worksheet
+
+    Set wb = ActiveWorkbook
+    anzahl = 0
+    For Each ws In wb.Worksheets
+        If IstProjektBlatt(ws) Then anzahl = anzahl + 1
+    Next ws
+
+    Call Baue_Gesamtuebersicht(wb)
+
+    MsgBox "Gesamtuebersicht wurde neu aufgebaut (" & anzahl & " Projekte gefunden).", _
+           vbInformation, "Gesamtuebersicht aktualisiert"
 End Sub
